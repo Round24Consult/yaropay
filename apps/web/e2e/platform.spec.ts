@@ -140,9 +140,22 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await page.getByTestId("confirm-person-action").click()
   await expect(chi).not.toContainText("Disabled")
 
+  // Platform → Settings: a sender saved here wins over the server's, and Clear goes back to it.
+  await page.goto("/platform/settings")
+  const sender = page.getByTestId("operator-setting-mailFrom")
+  await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Server setting")
+  await sender.getByTestId("operator-input-mailFrom").fill("YaroPay Ops <ops@example.test>")
+  await sender.getByTestId("operator-save-mailFrom").click()
+  await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Saved here")
+  await expect(page.getByTestId("operator-current-mailFrom")).toHaveText("YaroPay Ops <ops@example.test>")
+  await sender.getByTestId("operator-clear-mailFrom").click()
+  await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Server setting")
+  // Secrets are never shown: an unset email server says so.
+  await expect(page.getByTestId("operator-current-smtpUrl")).toHaveText("nothing")
+
   // Everything above is in the platform audit log.
   await page.goto("/platform/audit")
-  for (const action of ["Disabled an account", "Deleted a workspace", "Created a workspace", "Opened a support view", "Opened sign-ups", "Changed exchange rates", "Changed a plan's price", "Changed a workspace's billing"]) {
+  for (const action of ["Changed a server setting", "Disabled an account", "Deleted a workspace", "Created a workspace", "Opened a support view", "Opened sign-ups", "Changed exchange rates", "Changed a plan's price", "Changed a workspace's billing"]) {
     await expect(page.getByRole("cell", { name: new RegExp(action) }).first()).toBeVisible()
   }
 })

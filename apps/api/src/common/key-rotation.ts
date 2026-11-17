@@ -9,6 +9,8 @@ export const ENCRYPTED_COLUMNS = [
   { table: "products", id: "id", column: "signing_secret_enc" },
   { table: "workspaces", id: "id", column: "alerts_webhook_url_enc" },
   { table: "settings", id: "id", column: "alerts_webhook_url_enc" },
+  { table: "settings", id: "id", column: "billing_paystack_secret_key_enc" },
+  { table: "settings", id: "id", column: "smtp_url_enc" },
   { table: "users", id: "id", column: "totp_secret_enc" },
   { table: "users", id: "id", column: "totp_pending_secret_enc" },
   { table: "billing_payment_methods", id: "workspace_id", column: "authorization_enc" },

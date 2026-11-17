@@ -19,4 +19,4 @@ log.log(`API listening on http://${config.host === "0.0.0.0" ? "localhost" : con
 if (config.encryptionKeyIsDevDefault) {
   log.warn("YAROPAY_ENCRYPTION_KEY is not set: using the development key. Set it before storing real gateway keys.")
 }
-if (!config.smtpUrl) log.warn("SMTP_URL is not set: emails are printed to this log instead of being sent.")
+if (!config.smtpUrl) log.warn("SMTP_URL is not set: emails are printed to this log instead of being sent, unless an email server is saved in the platform console.")

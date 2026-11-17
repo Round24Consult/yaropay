@@ -195,13 +195,23 @@ API (`apps/api`, see `apps/api/.env.example`):
 | `SETUP_TOKEN` | none | When set, creating the first (owner) account needs it, from `/setup?token=…` or the setup form. **Set it on any install reachable from the internet**, or whoever opens `/setup` first becomes the owner. |
 | `DASHBOARD_URL` | `http://localhost:3000` | CORS, CSRF origin check, links in emails |
 | `YAROPAY_BASE_URL` | `http://localhost:4000` | Public base URL suggested on first run (editable in Settings) |
-| `SMTP_URL`, `MAIL_FROM` | empty | Email delivery. Empty prints emails to the log. |
+| `SMTP_URL`, `MAIL_FROM` | empty | Email delivery. Empty prints emails to the log. Cloud: can also be set in Platform → Settings (see below). |
 | `COOKIE_SECURE` | `auto` | Secure session cookie (on in production) |
 | `TRUST_PROXY` | `loopback` | Express `trust proxy`, for client IPs behind a proxy |
 | `WEBHOOK_ALLOW_PRIVATE` | on in dev, off in production | Allow product webhook URLs on private networks |
 | `WORKERS` | on | Delivery and outbox workers. Several API instances can share them. |
-| `RATE_LIMIT` | on | Per-IP limits on sign-in, reset and invite endpoints |
+| `RATE_LIMIT` | on | Per-IP limits on sign-in, reset and invite endpoints, and the per-company product API limit |
+| `V1_RATE_LIMIT_PER_MINUTE` | `1200` | Product API requests one company can make each minute. Cloud: can also be set in Platform → Settings. |
 | `<ID>_API_URL` (`PAYSTACK_API_URL`, `FLUTTERWAVE_API_URL`, ...) | the gateway's own API | Send one gateway's API calls through a proxy or to another host |
+
+On YaroPay Cloud, the super admin can change the email server (`SMTP_URL`), the email sender (`MAIL_FROM`), the
+product API limit (`V1_RATE_LIMIT_PER_MINUTE`) and the billing Paystack key (`BILLING_PAYSTACK_SECRET_KEY`) in
+**Platform → Settings** instead of the server's `.env`. A value saved there wins over the env value and applies
+at once on every API instance (within about 10 seconds); **Clear** goes back to the env value. Secrets are
+stored encrypted (and re-encrypted by the key rotation command), never shown again except their last 4
+characters, and every change needs the password and a two-step code and is recorded in the platform audit log.
+Security-critical values (`YAROPAY_ENCRYPTION_KEY`, `DATABASE_URL`, `SETUP_TOKEN`, `YAROPAY_CLOUD`) can only be
+set in the env.
 
 Dashboard (`apps/web`): `YAROPAY_API_URL` (default `http://localhost:4000`). The dashboard proxies `/api` and `/v1` to the API so the session cookie stays first-party. Next.js compiles rewrites at build time, so set it before `next build` (the Dockerfile takes it as a build argument).
 

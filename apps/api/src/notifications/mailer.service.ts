@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common"
 import nodemailer, { type Transporter } from "nodemailer"
 import { APP_CONFIG, type AppConfig } from "../config/config.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 export interface Mail {
   to: string
@@ -10,31 +11,48 @@ export interface Mail {
 }
 
 /**
- * Sends email over SMTP when SMTP_URL is set. Without it, emails are logged
- * and kept in `outbox` (useful in development and tests).
+ * Sends email over SMTP. The server is the one saved in the platform console, otherwise SMTP_URL; the
+ * sender likewise comes from the console or MAIL_FROM. Without an SMTP server, emails are logged and
+ * kept in `outbox` (useful in development and tests). A changed SMTP URL takes effect on the next email.
  */
 @Injectable()
 export class MailerService {
   private readonly logger = new Logger("Mailer")
-  private readonly transport: Transporter | null
+  private transport: Transporter | null = null
+  private transportUrl: string | null = null
   readonly outbox: Mail[] = []
+  /** Builds the SMTP transport for a URL. Tests swap it for a fake. */
+  transportFactory: (url: string) => Transporter = (url) => nodemailer.createTransport(url)
 
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {
-    this.transport = config.smtpUrl ? nodemailer.createTransport(config.smtpUrl) : null
-  }
+  constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly operator: OperatorSettingsService,
+  ) {}
 
   get enabled(): boolean {
-    return this.transport !== null
+    return (this.operator.current().smtpUrl ?? this.config.smtpUrl) !== null
   }
 
   async send(mail: Mail): Promise<void> {
-    if (!this.transport) {
+    const saved = await this.operator.get()
+    const transport = this.transportFor(saved.smtpUrl ?? this.config.smtpUrl)
+    if (!transport) {
       this.outbox.push(mail)
       if (this.outbox.length > 100) this.outbox.shift()
       if (this.config.env !== "test") this.logger.log(`Email to ${mail.to}: ${mail.subject}\n${mail.text}`)
       return
     }
-    await this.transport.sendMail({ from: this.config.mailFrom, ...mail })
+    await transport.sendMail({ from: saved.mailFrom ?? this.config.mailFrom, ...mail })
+  }
+
+  /** The transport for this URL, rebuilt when the URL changes. */
+  private transportFor(url: string | null): Transporter | null {
+    if (url !== this.transportUrl) {
+      this.transport?.close()
+      this.transport = url ? this.transportFactory(url) : null
+      this.transportUrl = url
+    }
+    return this.transport
   }
 }
 

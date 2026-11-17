@@ -99,6 +99,13 @@
       "when": 1794922270333,
       "tag": "0013_trusted_browsers",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794923472539,
+      "tag": "0014_operator_settings",
+      "breakpoints": true
     }
   ]
 }
