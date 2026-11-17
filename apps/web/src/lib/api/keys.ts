@@ -4,6 +4,7 @@ export const qk = {
   me: ["auth", "me"] as const,
   entitlements: ["entitlements"] as const,
   sessions: ["auth", "sessions"] as const,
+  trustedBrowsers: ["auth", "trusted-browsers"] as const,
   mfa: ["auth", "mfa"] as const,
   invitePreview: (token: string) => ["auth", "invite", token] as const,
   overview: (params: object) => ["overview", params] as const,

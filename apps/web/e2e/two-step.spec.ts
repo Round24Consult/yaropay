@@ -62,13 +62,34 @@ test("a member turns on two-step sign-in and then signs in with a code or a reco
   await expect(withCode).toHaveURL(/\/$/)
   await withCode.context().close()
 
-  // Lost phone: a recovery code works once.
+  // Lost phone: a recovery code works once. This time the member also trusts the browser.
   const withRecovery = await signIn(browser, email, password)
   await withRecovery.getByRole("button", { name: "Use a recovery code" }).click()
   await withRecovery.getByTestId("mfa-code").fill(recovery)
+  await withRecovery.getByTestId("trust-browser").click()
   await withRecovery.getByTestId("mfa-submit").click()
   await expect(withRecovery).toHaveURL(/\/$/)
   await withRecovery.goto("/settings?tab=security")
   await expect(withRecovery.getByTestId("recovery-codes-left")).toHaveText("9 recovery codes left.")
+  await expect(withRecovery.getByTestId("trusted-browser")).toHaveCount(1)
+  await expect(withRecovery.getByTestId("trusted-browser")).toContainText("This browser")
+
+  // Signing in again on this browser asks for the password only.
+  const signInAgain = async () => {
+    await withRecovery.request.post("/api/auth/logout")
+    await withRecovery.goto("/login")
+    await withRecovery.getByLabel("Email").fill(email)
+    await withRecovery.getByLabel("Password", { exact: true }).fill(password)
+    await withRecovery.getByTestId("login-submit").click()
+  }
+  await signInAgain()
+  await expect(withRecovery).toHaveURL(/\/$/)
+
+  // Removing it from Settings brings the code step back.
+  await withRecovery.goto("/settings?tab=security")
+  await withRecovery.getByTestId("trusted-browser").getByRole("button", { name: "Remove" }).click()
+  await expect(withRecovery.getByTestId("trusted-browser")).toHaveCount(0)
+  await signInAgain()
+  await expect(withRecovery.getByRole("heading", { name: "Two-step sign-in" })).toBeVisible()
   await withRecovery.context().close()
 })

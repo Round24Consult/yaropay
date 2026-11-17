@@ -11,9 +11,10 @@ import type { Db } from "../database/db.js"
 import { sessions, type UserRow, users } from "../database/schema.js"
 import { SettingsService } from "../settings/settings.service.js"
 import { WorkspacesService } from "../workspaces/workspaces.service.js"
-import { AuthService, type ClientMeta } from "./auth.service.js"
+import { AuthService, type ClientMeta, describeAgent } from "./auth.service.js"
 import { verifyPassword } from "./password.js"
 import { generateRecoveryCodes, generateTotpSecret, normaliseRecoveryCode, otpauthUri, verifyTotp } from "./totp.js"
+import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, SessionContext } from "./types.js"
 
 const DAY = 86_400_000
@@ -38,6 +39,7 @@ export class MfaService {
     private readonly settings: SettingsService,
     private readonly workspaces: WorkspacesService,
     private readonly encryption: EncryptionService,
+    private readonly trusted: TrustedBrowsersService,
   ) {}
 
   private async user(id: string): Promise<UserRow> {
@@ -113,6 +115,7 @@ export class MfaService {
       .set({ totpSecretEnc: null, totpPendingSecretEnc: null, totpEnabledAt: null, totpLastStep: null, recoveryCodeHashes: [], updatedAt: now })
       .where(eq(users.id, u.id))
     await this.db.update(sessions).set({ assurance: "password" }).where(and(eq(sessions.userId, u.id), eq(sessions.assurance, "mfa")))
+    await forgetTrustedBrowsers(this.db, u.id)
     await this.recordEverywhere(u, "Turned off two-step sign-in", meta)
     await this.auth.sendMail(u.email, "Two-step sign-in is off", [
       `Signing in to ${u.email} needs only your password again.`,
@@ -136,9 +139,16 @@ export class MfaService {
 
   /**
    * The code step of signing in. Too many wrong codes end the pending session, so guessing means
-   * starting over with the password each time (and the sign-in limit applies to that).
+   * starting over with the password each time (and the sign-in limit applies to that). With
+   * `trustBrowser`, it also returns a token for the trusted-browser cookie.
    */
-  async verify(actor: Actor, session: SessionContext, code: string, meta: ClientMeta): Promise<SessionUser> {
+  async verify(
+    actor: Actor,
+    session: SessionContext,
+    code: string,
+    meta: ClientMeta,
+    opts: { trustBrowser?: boolean } = {},
+  ): Promise<{ user: SessionUser; trusted: { token: string; expiresAt: Date } | null }> {
     if (session.assurance !== "pending") throw conflict("This session is already signed in.")
     const u = await this.user(actor.id)
     // Someone who has the password could otherwise keep starting new sessions for fresh guesses.
@@ -173,7 +183,13 @@ export class MfaService {
       .set({ assurance: "mfa", authenticatedAt: now, lastSeenAt: now, mfaFailures: 0, expiresAt: new Date(now.getTime() + this.config.sessionDays * DAY) })
       .where(eq(sessions.id, session.id))
     await this.auth.signedIn(u, actor.workspaceId, meta, session.id)
-    return this.auth.sessionUser({ ...actor, mfaEnabled: true })
+    let trusted: { token: string; expiresAt: Date } | null = null
+    if (opts.trustBrowser) {
+      const label = describeAgent(meta.userAgent)
+      trusted = await this.trusted.trust(u.id, label)
+      await this.audit.record({ workspaceId: actor.workspaceId, actorId: u.id, actorName: u.name, ip: meta.ip }, "Trusted a browser for 30 days", label)
+    }
+    return { user: await this.auth.sessionUser({ ...actor, mfaEnabled: true }), trusted }
   }
 
   /** Confirms the password (and code, when two-step sign-in is on) again before a sensitive action. */

@@ -26,6 +26,7 @@ import { JobsService } from "../notifications/jobs.service.js"
 import { SettingsService } from "../settings/settings.service.js"
 import { WorkspacesService } from "../workspaces/workspaces.service.js"
 import { dummyHash, hashPassword, verifyPassword } from "./password.js"
+import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, Assurance, SessionContext } from "./types.js"
 
 export const SESSION_COOKIE = "yaropay_session"
@@ -92,6 +93,7 @@ export class AuthService {
     private readonly workspaces: WorkspacesService,
     @Inject(PERMISSION_RESOLVER) private readonly permissionResolver: PermissionResolver,
     @Inject(EDITION) private readonly edition: Edition,
+    private readonly trusted: TrustedBrowsersService,
   ) {}
 
   /** The member's permissions in their workspace: the role's, unless the paid build says otherwise. */
@@ -150,7 +152,12 @@ export class AuthService {
     return { user: await this.sessionUser(toActor(user, member, await this.permissionsOf(user.id, member))), token }
   }
 
-  async login(email: string, password: string, meta: ClientMeta) {
+  /**
+   * Signs in with a password. With two-step sign-in on, the session waits for the authenticator code,
+   * unless `trustedToken` is a browser this same person trusted (and hasn't expired or been removed).
+   * `clearTrusted` asks the caller to drop a trusted-browser cookie that no longer means anything.
+   */
+  async login(email: string, password: string, meta: ClientMeta, trustedToken?: string) {
     const [user] = await this.db
       .select()
       .from(users)
@@ -180,14 +187,25 @@ export class AuthService {
     const workspaceId = memberships[0].id
     const member = (await this.workspaces.member(workspaceId, user.id))!
 
-    // With two-step sign-in on, the session only becomes usable once the authenticator code is in.
+    // With two-step sign-in on, the session only becomes usable once the authenticator code is in,
+    // unless this browser was trusted when the code was last entered on it.
     if (user.totpEnabledAt) {
+      await this.trusted.pruneExpired(user.id)
+      const trust = await this.trusted.check(trustedToken, user.id)
+      if (trust) {
+        // It counts as a two-step sign-in, but authenticatedAt is when the code was actually entered, so
+        // actions that need a recent code (the platform console's changes) still ask for one.
+        const { token, id } = await this.createSessionRow(user.id, workspaceId, meta, this.db, { assurance: "mfa", authenticatedAt: trust.createdAt })
+        await this.signedIn(user, workspaceId, meta, id)
+        await this.audit.record({ workspaceId, actorId: user.id, actorName: user.name, ip: meta.ip }, "Signed in from a trusted browser", trust.label)
+        return { user: toSessionUser(toActor(user, member, await this.permissionsOf(user.id, member)), memberships), token }
+      }
       const token = await this.createSession(user.id, workspaceId, meta, this.db, { pending: true })
-      return { mfaRequired: true as const, token }
+      return { mfaRequired: true as const, token, clearTrusted: Boolean(trustedToken) }
     }
     const { token, id } = await this.createSessionRow(user.id, workspaceId, meta)
     await this.signedIn(user, workspaceId, meta, id)
-    return { user: toSessionUser(toActor(user, member, await this.permissionsOf(user.id, member)), memberships), token }
+    return { user: toSessionUser(toActor(user, member, await this.permissionsOf(user.id, member)), memberships), token, clearTrusted: Boolean(trustedToken) }
   }
 
   /** After a full sign-in: marks the account active and warns about a browser not seen before. */
@@ -231,7 +249,13 @@ export class AuthService {
     return (await this.createSessionRow(userId, workspaceId, meta, tx, opts)).token
   }
 
-  private async createSessionRow(userId: string, workspaceId: string, meta: ClientMeta, tx: DbOrTx = this.db, opts: { pending?: boolean } = {}) {
+  private async createSessionRow(
+    userId: string,
+    workspaceId: string,
+    meta: ClientMeta,
+    tx: DbOrTx = this.db,
+    opts: { pending?: boolean; assurance?: Assurance; authenticatedAt?: Date } = {},
+  ) {
     const token = randomToken()
     const id = newId("ses")
     await tx.insert(sessions).values({
@@ -241,7 +265,8 @@ export class AuthService {
       tokenHash: sha256(token),
       userAgent: meta.userAgent?.slice(0, 300) ?? null,
       ip: meta.ip,
-      assurance: opts.pending ? "pending" : "password",
+      assurance: opts.pending ? "pending" : (opts.assurance ?? "password"),
+      authenticatedAt: opts.authenticatedAt,
       expiresAt: new Date(Date.now() + (opts.pending ? PENDING_SESSION_MS : this.config.sessionDays * DAY)),
     })
     return { token, id }
@@ -355,6 +380,11 @@ export class AuthService {
     })
   }
 
+  /** Records something the person did to their own account, in the workspace they're signed in to. */
+  async recordForAccount(actor: Actor, action: string, target: string, meta: ClientMeta) {
+    await this.audit.record({ workspaceId: actor.workspaceId, actorId: actor.id, actorName: actor.name, ip: meta.ip }, action, target)
+  }
+
   async logout(sessionId: string) {
     await this.db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, sessionId))
   }
@@ -374,9 +404,10 @@ export class AuthService {
       .update(sessions)
       .set({ revokedAt: new Date() })
       .where(and(eq(sessions.userId, actor.id), ne(sessions.id, sessionId), isNull(sessions.revokedAt)))
+    await forgetTrustedBrowsers(this.db, actor.id)
     await this.audit.record({ workspaceId: actor.workspaceId, actorId: actor.id, actorName: actor.name, ip: meta.ip }, "Changed password", actor.email)
     await this.sendMail(user.email, "Your password was changed", [
-      `The password for ${user.email} was just changed. Other sessions were signed out.`,
+      `The password for ${user.email} was just changed. Other sessions were signed out, and trusted browsers will ask for your authenticator code again.`,
       "If this wasn't you, reset your password right away.",
     ])
   }
@@ -440,6 +471,7 @@ export class AuthService {
       await tx.update(passwordResets).set({ usedAt: now }).where(eq(passwordResets.id, reset.id))
       await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, reset.userId))
       await tx.update(sessions).set({ revokedAt: now }).where(and(eq(sessions.userId, reset.userId), isNull(sessions.revokedAt)))
+      await forgetTrustedBrowsers(tx, reset.userId)
     })
     const [user] = await this.db.select().from(users).where(eq(users.id, reset.userId))
     // The account belongs to every workspace the person is in: each one's audit log hears about it.

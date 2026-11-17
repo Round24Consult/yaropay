@@ -44,6 +44,9 @@ const ROUTES: Record<string, "checked" | "public" | "self"> = {
   "POST /api/auth/password": "self",
   "GET /api/auth/sessions": "self",
   "DELETE /api/auth/sessions/:id": "self",
+  "GET /api/auth/trusted-browsers": "self",
+  "DELETE /api/auth/trusted-browsers/:id": "self",
+  "DELETE /api/auth/trusted-browsers": "self",
   // Two-step sign-in belongs to the account, not to a workspace.
   "POST /api/auth/mfa/verify": "self",
   "GET /api/auth/mfa": "self",

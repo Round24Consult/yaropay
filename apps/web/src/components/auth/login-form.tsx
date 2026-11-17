@@ -1,7 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { loginSchema } from "@yaropay/core/auth"
+import { loginSchema, TRUSTED_BROWSER_DAYS } from "@yaropay/core/auth"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -9,6 +9,7 @@ import * as React from "react"
 import { type Resolver, useForm } from "react-hook-form"
 import type { z } from "zod"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ApiRequestError } from "@/lib/api/client"
@@ -113,6 +114,7 @@ function CodeStep({ next, onStartOver }: { next: string; onStartOver: () => void
   const logout = useLogout()
   const [recovery, setRecovery] = React.useState(false)
   const [code, setCode] = React.useState("")
+  const [trustBrowser, setTrustBrowser] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -128,7 +130,7 @@ function CodeStep({ next, onStartOver }: { next: string; onStartOver: () => void
     e.preventDefault()
     setError(null)
     try {
-      await verify.mutateAsync({ code })
+      await verify.mutateAsync({ code, trustBrowser })
       navigateAfterAuth(next)
     } catch (err) {
       if (err instanceof ApiRequestError && (err.code === "mfa_locked" || err.status === 401)) {
@@ -179,6 +181,15 @@ function CodeStep({ next, onStartOver }: { next: string; onStartOver: () => void
               data-testid="mfa-code"
             />
           )}
+        </Field>
+        <Field orientation="horizontal" className="items-start gap-2.5">
+          <Checkbox id="trust-browser" checked={trustBrowser} onCheckedChange={(v) => setTrustBrowser(v === true)} className="mt-0.5" data-testid="trust-browser" />
+          <div className="grid gap-1">
+            <FieldLabel htmlFor="trust-browser" className="font-normal">
+              Trust this browser for {TRUSTED_BROWSER_DAYS} days
+            </FieldLabel>
+            <p className="text-xs text-muted-foreground">You&apos;ll still enter your password. Don&apos;t tick this on a shared or public computer.</p>
+          </div>
         </Field>
         <Button type="submit" className="w-full" disabled={verify.isPending || code.trim().length < 6} data-testid="mfa-submit">
           {verify.isPending && <Loader2 className="animate-spin" />}
