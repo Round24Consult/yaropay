@@ -1,0 +1,30 @@
+{
+  "requestSuccessful": true,
+  "responseMessage": "success",
+  "responseCode": "0",
+  "responseBody": {
+    "transactionReference": "MNFY|20261117120500|000124",
+    "paymentReference": "SHW_FIXTURE002",
+    "paymentDescription": "Shopwise",
+    "currency": "NGN",
+    "customer": {
+      "email": "kemi@example.com",
+      "name": "Kemi Adeyemi"
+    },
+    "metaData": {
+      "yaropay_product": "prd_fixture1",
+      "orderId": "1042",
+      "yaropay_reference": "SHW_FIXTURE002"
+    },
+    "product": {
+      "type": "API_NOTIFICATION",
+      "reference": "SHW_FIXTURE001"
+    },
+    "amountPaid": "0.00",
+    "totalPayable": "15000.00",
+    "settlementAmount": "0.00",
+    "paidOn": null,
+    "paymentStatus": "FAILED",
+    "paymentMethod": "CARD"
+  }
+}

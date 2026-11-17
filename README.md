@@ -19,7 +19,7 @@ A company installs YaroPay once, adds its payment gateway keys ([see the gateway
 | Flutterwave | Available | NGN, GHS, KES, ZAR, USD | |
 | Stripe | Beta | 130+, including USD, EUR, GBP, NGN, JPY | Stripe Checkout (hosted page). Add the webhook endpoint's signing secret after installing. |
 | PayPal | Beta | 24, including USD, EUR, GBP, JPY, AUD | PayPal Orders v2: YaroPay captures the order when the customer returns or PayPal reports the approval. Add the webhook ID after installing. |
-| Monnify | Coming soon | | |
+| Monnify | Beta | NGN | Bank transfer, card and USSD on Monnify's hosted checkout. Needs the API key, secret key and contract code. |
 | Korapay | Coming soon | | |
 
 **Available** gateways have been confirmed with real sandbox payments. **Beta** gateways are fully usable but

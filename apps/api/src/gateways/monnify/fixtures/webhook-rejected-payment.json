@@ -1,0 +1,19 @@
+{
+  "eventType": "REJECTED_PAYMENT",
+  "eventData": {
+    "transactionReference": "MNFY|20261117120500|000124",
+    "paymentReference": "SHW_FIXTURE002",
+    "amountPaid": 9000,
+    "totalPayable": 15000,
+    "currency": "NGN",
+    "paymentMethod": "ACCOUNT_TRANSFER",
+    "paymentStatus": "FAILED",
+    "customer": {
+      "email": "kemi@example.com",
+      "name": "Kemi Adeyemi"
+    },
+    "metaData": {
+      "yaropay_product": "prd_fixture1"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "requestSuccessful": true,
+  "responseMessage": "success",
+  "responseCode": "0",
+  "responseBody": {
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.fixture.not-a-real-token",
+    "expiresIn": 3567
+  }
+}
