@@ -108,8 +108,7 @@ jobs:
 
   docker:
     name: Docker images
-    # Only on main, to keep pull requests fast and Actions minutes low.
-    if: github.event_name == 'push'
+    # On pull requests too (nothing is pushed), so a broken image blocks the merge instead of the deploy.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
