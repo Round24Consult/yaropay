@@ -4,6 +4,7 @@ import type { GatewayAdapter } from "./kit.js"
 import { flutterwaveAdapter } from "./flutterwave/adapter.js"
 import { paystackAdapter } from "./paystack/adapter.js"
 import { stripeAdapter } from "./stripe/adapter.js"
+import { paypalAdapter } from "./paypal/adapter.js"
 // gateway:imports
 
 /**
@@ -14,6 +15,7 @@ export const ADAPTERS: Partial<Record<GatewayId, GatewayAdapter>> = {
   paystack: paystackAdapter,
   flutterwave: flutterwaveAdapter,
   stripe: stripeAdapter,
+  paypal: paypalAdapter,
   // gateway:entries
 }
 

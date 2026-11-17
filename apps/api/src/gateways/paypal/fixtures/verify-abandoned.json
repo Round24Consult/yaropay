@@ -1,0 +1,16 @@
+{
+  "id": "9VF33318HJ0218434",
+  "intent": "CAPTURE",
+  "status": "VOIDED",
+  "purchase_units": [
+    {
+      "reference_id": "SHW_FIXTURE003",
+      "custom_id": "SHW_FIXTURE003",
+      "description": "Shopwise",
+      "amount": {
+        "currency_code": "USD",
+        "value": "1500.00"
+      }
+    }
+  ]
+}

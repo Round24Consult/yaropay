@@ -35,6 +35,7 @@ export async function createTestApp(env: Record<string, string> = {}, opts: { ex
     YAROPAY_BASE_URL: "https://pay.example.test",
     PAYSTACK_API_URL: "https://api.paystack.test",
     FLUTTERWAVE_API_URL: "https://api.flutterwave.test",
+    PAYPAL_API_URL: "https://api.paypal.test",
     LOG_LEVEL: "error",
     ...env,
   })

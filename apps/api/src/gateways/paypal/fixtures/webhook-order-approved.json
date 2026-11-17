@@ -1,0 +1,33 @@
+{
+  "id": "WH-COC11055RA711503B-4YM959094A144403T",
+  "event_version": "1.0",
+  "create_time": "2026-11-17T12:03:59.000Z",
+  "resource_type": "checkout-order",
+  "resource_version": "2.0",
+  "event_type": "CHECKOUT.ORDER.APPROVED",
+  "summary": "An order has been approved by buyer",
+  "resource": {
+    "id": "5O190127TN364715T",
+    "intent": "CAPTURE",
+    "status": "APPROVED",
+    "payer": {
+      "name": {
+        "given_name": "Kemi",
+        "surname": "Adeyemi"
+      },
+      "email_address": "kemi@example.com",
+      "payer_id": "QYR5Z8XDVJNXQ"
+    },
+    "purchase_units": [
+      {
+        "reference_id": "SHW_FIXTURE001",
+        "custom_id": "SHW_FIXTURE001",
+        "description": "Shopwise",
+        "amount": {
+          "currency_code": "USD",
+          "value": "1500.00"
+        }
+      }
+    ]
+  }
+}

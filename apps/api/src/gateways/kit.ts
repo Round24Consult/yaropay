@@ -66,6 +66,12 @@ export interface ParsedWebhook {
   /** Set when the event moves a payment to a new status. */
   payment: Omit<GatewayPayment, "message"> | null
   metadata: Record<string, unknown>
+  /**
+   * Set when the customer approved a payment that still needs completing, such as PayPal's
+   * CHECKOUT.ORDER.APPROVED. YaroPay calls the adapter's `finalize` for the payment, then checks it, so a
+   * customer who closes the tab instead of returning is still charged.
+   */
+  needsFinalize?: { checkoutId: string | null }
 }
 
 export interface CallbackParams {
@@ -144,6 +150,8 @@ export interface GatewayRequestInit {
   body?: unknown
   /** Sent as application/x-www-form-urlencoded instead of JSON (Stripe, OAuth token endpoints). */
   form?: Record<string, string>
+  /** Sent as JSON exactly as given, for a body that must keep the bytes the gateway signed (PayPal's webhook check). */
+  jsonText?: string
   headers?: Record<string, string>
 }
 
@@ -164,10 +172,10 @@ export async function gatewayRequest<T>(ctx: AdapterContext, gatewayName: string
       headers: {
         ...authHeader(init),
         accept: "application/json",
-        ...(form !== undefined ? { "content-type": "application/x-www-form-urlencoded" } : init.body !== undefined ? { "content-type": "application/json" } : {}),
+        ...(form !== undefined ? { "content-type": "application/x-www-form-urlencoded" } : init.body !== undefined || init.jsonText !== undefined ? { "content-type": "application/json" } : {}),
         ...init.headers,
       },
-      body: form ?? (init.body !== undefined ? JSON.stringify(init.body) : undefined),
+      body: form ?? init.jsonText ?? (init.body !== undefined ? JSON.stringify(init.body) : undefined),
       signal: AbortSignal.timeout(ctx.timeoutMs),
     })
   } catch (e) {
