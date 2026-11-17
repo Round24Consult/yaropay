@@ -1,0 +1,18 @@
+# Groups the automatically generated release notes by pull request label.
+# A pull request can carry several labels; it is listed under the first category that matches.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: New gateways
+      labels: [gateway]
+    - title: New features
+      labels: [feature, enhancement]
+    - title: Fixes
+      labels: [bug, fix]
+    - title: Security
+      labels: [security]
+    - title: Documentation
+      labels: [documentation, docs]
+    - title: Other changes
+      labels: ["*"]
