@@ -8,10 +8,10 @@ name: Deploy
 # Repository secrets:   DEPLOY_SSH_KEY (private key of the `deploy` user), DEPLOY_KNOWN_HOSTS (the server's host keys),
 #                       EE_DEPLOY_KEY (read-only deploy key of the private yaropay-ee repository)
 #
-# Server settings: every secret or variable named ENV_<KEY> (on the repository or its `production`
-# environment) is merged into the server's .env as <KEY> before the restart, so settings change without
-# SSH: edit it on GitHub, then Actions -> Deploy -> Run workflow. See "Changing server settings from
-# GitHub" in the README.
+# Server settings: a secret or variable named ENV_<KEY> (on the repository or its `production`
+# environment), for each key listed in the "Apply server settings from GitHub" step, is merged into the
+# server's .env as <KEY> before the restart, so settings change without SSH: edit it on GitHub, then
+# Actions -> Deploy -> Run workflow. See "Changing server settings from GitHub" in the README.
 
 on:
   workflow_run:
@@ -114,16 +114,37 @@ jobs:
           fi
           REMOTE
       - name: Apply server settings from GitHub
+        # One line per setting the hosted stack reads: ENV_<KEY> as a secret or a variable (the secret wins).
+        # To support another key, add it here. Keys that must never change this way are left out and
+        # also refused by apply-env.py.
         env:
-          ALL_SECRETS: ${{ toJSON(secrets) }}
-          ALL_VARS: ${{ toJSON(vars) }}
+          ENV_APP_DOMAIN: ${{ secrets.ENV_APP_DOMAIN || vars.ENV_APP_DOMAIN }}
+          ENV_SITE_DOMAIN: ${{ secrets.ENV_SITE_DOMAIN || vars.ENV_SITE_DOMAIN }}
+          ENV_YAROPAY_CLOUD: ${{ secrets.ENV_YAROPAY_CLOUD || vars.ENV_YAROPAY_CLOUD }}
+          ENV_YAROPAY_DISABLE_EE: ${{ secrets.ENV_YAROPAY_DISABLE_EE || vars.ENV_YAROPAY_DISABLE_EE }}
+          ENV_SETUP_TOKEN: ${{ secrets.ENV_SETUP_TOKEN || vars.ENV_SETUP_TOKEN }}
+          ENV_YAROPAY_ENCRYPTION_KEY_PREVIOUS: ${{ secrets.ENV_YAROPAY_ENCRYPTION_KEY_PREVIOUS || vars.ENV_YAROPAY_ENCRYPTION_KEY_PREVIOUS }}
+          ENV_SMTP_URL: ${{ secrets.ENV_SMTP_URL || vars.ENV_SMTP_URL }}
+          ENV_MAIL_FROM: ${{ secrets.ENV_MAIL_FROM || vars.ENV_MAIL_FROM }}
+          ENV_BILLING_PAYSTACK_SECRET_KEY: ${{ secrets.ENV_BILLING_PAYSTACK_SECRET_KEY || vars.ENV_BILLING_PAYSTACK_SECRET_KEY }}
+          ENV_LOG_LEVEL: ${{ secrets.ENV_LOG_LEVEL || vars.ENV_LOG_LEVEL }}
+          ENV_SESSION_DAYS: ${{ secrets.ENV_SESSION_DAYS || vars.ENV_SESSION_DAYS }}
+          ENV_PASSWORD_HASH_COST: ${{ secrets.ENV_PASSWORD_HASH_COST || vars.ENV_PASSWORD_HASH_COST }}
+          ENV_RATE_LIMIT: ${{ secrets.ENV_RATE_LIMIT || vars.ENV_RATE_LIMIT }}
+          ENV_V1_RATE_LIMIT_PER_MINUTE: ${{ secrets.ENV_V1_RATE_LIMIT_PER_MINUTE || vars.ENV_V1_RATE_LIMIT_PER_MINUTE }}
+          ENV_CORS_ORIGINS: ${{ secrets.ENV_CORS_ORIGINS || vars.ENV_CORS_ORIGINS }}
+          ENV_GATEWAY_TIMEOUT_MS: ${{ secrets.ENV_GATEWAY_TIMEOUT_MS || vars.ENV_GATEWAY_TIMEOUT_MS }}
+          ENV_WEBHOOK_TIMEOUT_MS: ${{ secrets.ENV_WEBHOOK_TIMEOUT_MS || vars.ENV_WEBHOOK_TIMEOUT_MS }}
+          ENV_WEBHOOK_ALLOW_PRIVATE: ${{ secrets.ENV_WEBHOOK_ALLOW_PRIVATE || vars.ENV_WEBHOOK_ALLOW_PRIVATE }}
+          ENV_WORKERS: ${{ secrets.ENV_WORKERS || vars.ENV_WORKERS }}
+          ENV_WORKER_INTERVAL_MS: ${{ secrets.ENV_WORKER_INTERVAL_MS || vars.ENV_WORKER_INTERVAL_MS }}
+          ENV_DB_MIGRATE_ON_START: ${{ secrets.ENV_DB_MIGRATE_ON_START || vars.ENV_DB_MIGRATE_ON_START }}
+          ENV_BACKUP_KEEP_DAYS: ${{ secrets.ENV_BACKUP_KEEP_DAYS || vars.ENV_BACKUP_KEEP_DAYS }}
         run: |
           set -o pipefail
-          # ENV_<KEY> secrets and variables become <KEY> in the server's .env; a secret wins over a variable
-          # of the same name. Values travel on stdin only (never in a command line or the log), and
-          # apply-env.py prints key names only.
-          printf '%s\n%s\n' "$ALL_VARS" "$ALL_SECRETS" \
-            | jq -sc 'map(to_entries | map(select(.key | startswith("ENV_")) | .key |= ltrimstr("ENV_")) | from_entries) | add // {}' \
+          # Settings that are set become <KEY> in the server's .env. Values travel on stdin only (never in a
+          # command line or the log), and apply-env.py prints key names only.
+          jq -nc 'env | with_entries(select((.key | startswith("ENV_")) and .value != "") | .key |= ltrimstr("ENV_"))' \
             | ssh "$DEPLOY_USER@$HOST" 'python3 /opt/yaropay/apply-env.py /opt/yaropay/.env'
       - name: Pull images and restart
         env:
