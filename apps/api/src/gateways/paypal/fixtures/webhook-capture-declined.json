@@ -1,0 +1,21 @@
+{
+  "id": "WH-1FIXTUREDECLINED01",
+  "event_version": "1.0",
+  "create_time": "2026-11-17T12:04:13.000Z",
+  "resource_type": "capture",
+  "resource_version": "2.0",
+  "event_type": "PAYMENT.CAPTURE.DECLINED",
+  "summary": "A payment capture for $ 1500.0 USD was declined.",
+  "resource": {
+    "id": "7NW873794T343360M",
+    "status": "DECLINED",
+    "amount": {
+      "currency_code": "USD",
+      "value": "1500.00"
+    },
+    "custom_id": "SHW_FIXTURE002",
+    "status_details": {
+      "reason": "DECLINED_BY_RISK_FRAUD_FILTERS"
+    }
+  }
+}

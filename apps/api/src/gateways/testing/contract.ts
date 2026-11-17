@@ -7,9 +7,9 @@ import { readFileSync } from "node:fs"
 import type { Mode, TransactionStatus } from "@yaropay/core/types"
 import { describe, expect, it } from "vitest"
 import type { CallbackParams, Credentials, FinalizeParams, GatewayAdapter, GatewayPayment, InitializeParams, ParsedWebhook, PaymentRef } from "../kit.js"
-import { fakeGateway, type RecordedResponse, type Route } from "./fake-gateway.js"
+import { fakeGateway, type RecordedResponse, type Responder, type Route } from "./fake-gateway.js"
 
-export type { RecordedResponse, Route } from "./fake-gateway.js"
+export type { RecordedResponse, Responder, Route } from "./fake-gateway.js"
 
 /** What a test expects: any subset of the fields, at any depth (checked with toMatchObject). */
 export type Expected<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: Expected<T[K]> } : T
@@ -23,7 +23,7 @@ export interface GatewayFixtures {
    * Calls the adapter makes alongside the one under test, such as an OAuth token endpoint. Served in
    * every test; a test's own route wins when both match.
    */
-  routes?: Partial<Record<Route, RecordedResponse>>
+  routes?: Partial<Record<Route, RecordedResponse | Responder>>
   initialize: {
     params: InitializeParams
     route: Route
@@ -43,8 +43,11 @@ export interface GatewayFixtures {
     signed: { rawBody: string; headers: Record<string, string> }
     /** False for gateways whose signature doesn't cover the body (Flutterwave's shared hash). */
     bodySigned?: boolean
-    /** Calls the adapter makes to check a signature, for gateways that verify webhooks by API. */
-    routes?: Partial<Record<Route, RecordedResponse>>
+    /**
+     * Calls the adapter makes to check a signature, for gateways that verify webhooks by API. Use a
+     * Responder that only says "valid" for the exact signed request, so the forged cases fail.
+     */
+    routes?: Partial<Record<Route, RecordedResponse | Responder>>
     /** Webhook bodies and what parseWebhook must make of them. Include a successful payment. */
     events: { name: string; body: unknown; expect: Expected<ParsedWebhook> }[]
   }

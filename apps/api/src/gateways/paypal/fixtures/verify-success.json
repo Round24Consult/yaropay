@@ -1,0 +1,70 @@
+{
+  "id": "5O190127TN364715T",
+  "intent": "CAPTURE",
+  "status": "COMPLETED",
+  "payment_source": {
+    "paypal": {
+      "name": {
+        "given_name": "Kemi",
+        "surname": "Adeyemi"
+      },
+      "email_address": "kemi@example.com",
+      "payer_id": "QYR5Z8XDVJNXQ",
+      "account_status": "VERIFIED"
+    }
+  },
+  "payer": {
+    "name": {
+      "given_name": "Kemi",
+      "surname": "Adeyemi"
+    },
+    "email_address": "kemi@example.com",
+    "payer_id": "QYR5Z8XDVJNXQ"
+  },
+  "purchase_units": [
+    {
+      "reference_id": "SHW_FIXTURE001",
+      "custom_id": "SHW_FIXTURE001",
+      "description": "Shopwise",
+      "amount": {
+        "currency_code": "USD",
+        "value": "1500.00"
+      },
+      "payments": {
+        "captures": [
+          {
+            "id": "3C679366HH908993F",
+            "status": "COMPLETED",
+            "amount": {
+              "currency_code": "USD",
+              "value": "1500.00"
+            },
+            "final_capture": true,
+            "custom_id": "SHW_FIXTURE001",
+            "seller_protection": {
+              "status": "ELIGIBLE"
+            },
+            "seller_receivable_breakdown": {
+              "gross_amount": {
+                "currency_code": "USD",
+                "value": "1500.00"
+              },
+              "paypal_fee": {
+                "currency_code": "USD",
+                "value": "52.80"
+              },
+              "net_amount": {
+                "currency_code": "USD",
+                "value": "1447.20"
+              }
+            },
+            "create_time": "2026-11-17T12:04:11Z",
+            "update_time": "2026-11-17T12:04:11Z"
+          }
+        ]
+      }
+    }
+  ],
+  "create_time": "2026-11-17T12:02:30Z",
+  "update_time": "2026-11-17T12:04:11Z"
+}

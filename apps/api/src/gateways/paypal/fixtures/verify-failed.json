@@ -1,0 +1,41 @@
+{
+  "id": "8MC585209K746392H",
+  "intent": "CAPTURE",
+  "status": "COMPLETED",
+  "payer": {
+    "name": {
+      "given_name": "Kemi",
+      "surname": "Adeyemi"
+    },
+    "email_address": "kemi@example.com",
+    "payer_id": "QYR5Z8XDVJNXQ"
+  },
+  "purchase_units": [
+    {
+      "reference_id": "SHW_FIXTURE002",
+      "custom_id": "SHW_FIXTURE002",
+      "description": "Shopwise",
+      "amount": {
+        "currency_code": "USD",
+        "value": "1500.00"
+      },
+      "payments": {
+        "captures": [
+          {
+            "id": "7NW873794T343360M",
+            "status": "DECLINED",
+            "amount": {
+              "currency_code": "USD",
+              "value": "1500.00"
+            },
+            "custom_id": "SHW_FIXTURE002",
+            "status_details": {
+              "reason": "DECLINED_BY_RISK_FRAUD_FILTERS"
+            },
+            "create_time": "2026-11-17T12:06:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

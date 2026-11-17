@@ -6,6 +6,7 @@ import { korapay } from "./korapay/definition.ts"
 import { monnify } from "./monnify/definition.ts"
 import { paystack } from "./paystack/definition.ts"
 import { stripe } from "./stripe/definition.ts"
+import { paypal } from "./paypal/definition.ts"
 // gateway:imports
 
 /**
@@ -18,6 +19,7 @@ export const GATEWAYS = {
   paystack,
   flutterwave,
   stripe,
+  paypal,
   monnify,
   korapay,
   // gateway:entries

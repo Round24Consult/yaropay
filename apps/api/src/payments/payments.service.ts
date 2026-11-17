@@ -714,6 +714,10 @@ export class PaymentsService {
     }
 
     try {
+      const webhookSteps = (product: ProductRow) => [
+        step("webhook_received", `${parsed.type} webhook received`, `${requireGateway(gatewayId).webhook.signatureHeader} checked`, true),
+        step("routed", `Matched to ${product.name}`, matchedBy === "metadata" ? `metadata.${PRODUCT_METADATA_KEY} = ${product.id}` : matchedBy === "prefix" ? `Reference prefix ${product.referencePrefix}_` : "Known payment reference", true),
+      ]
       if (parsed.payment) {
         const [product] = await this.db.select().from(products).where(and(eq(products.workspaceId, ws), eq(products.id, productId)))
         let row = existing
@@ -725,15 +729,14 @@ export class PaymentsService {
           if (!verified) throw new Error("The gateway could not confirm this payment")
           payment = verified
         }
-        await this.settle(
-          row.id,
-          payment,
-          [
-            step("webhook_received", `${parsed.type} webhook received`, `${requireGateway(gatewayId).webhook.signatureHeader} checked`, true),
-            step("routed", `Matched to ${product.name}`, matchedBy === "metadata" ? `metadata.${PRODUCT_METADATA_KEY} = ${product.id}` : matchedBy === "prefix" ? `Reference prefix ${product.referencePrefix}_` : "Known payment reference", true),
-          ],
-          event.id,
-        )
+        await this.settle(row.id, payment, webhookSteps(product), event.id)
+      } else if (parsed.needsFinalize && existing && existing.status === "pending") {
+        // The customer approved the payment but may never come back to the return URL: complete it now
+        // (PayPal's capture), then record whatever the gateway reports.
+        const [product] = await this.db.select().from(products).where(and(eq(products.workspaceId, ws), eq(products.id, productId)))
+        await this.finalizeRow(existing, { reference: existing.reference, outcome: null, gatewayTransactionId: null, checkoutId: parsed.needsFinalize.checkoutId }, {})
+        const verified = await this.verifyRow(existing)
+        if (verified && verified.status !== "pending") await this.settle(existing.id, verified, webhookSteps(product), event.id)
       }
       await this.db.update(webhookEvents).set({ processedAt: new Date(), error: null }).where(eq(webhookEvents.id, event.id))
       return { status: 200, body: { received: true, routed: true } }
