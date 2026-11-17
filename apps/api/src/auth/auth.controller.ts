@@ -26,15 +26,18 @@ import { Inject } from "@nestjs/common"
 import { AuthService, type ClientMeta, PENDING_SESSION_MS, SESSION_COOKIE } from "./auth.service.js"
 import { AllowInSupport, AllowPending, CurrentSession, CurrentUser, Public } from "./decorators.js"
 import { MfaService } from "./mfa.service.js"
+import { TRUSTED_BROWSER_MS, TRUSTED_COOKIE, TRUSTED_COOKIE_PATH, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, SessionContext } from "./types.js"
 
 const meta = (req: Request): ClientMeta => ({ ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null })
+const trustedToken = (req: Request): string | undefined => (req.cookies as Record<string, string | undefined> | undefined)?.[TRUSTED_COOKIE]
 
 @Controller("api/auth")
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly mfa: MfaService,
+    private readonly trusted: TrustedBrowsersService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -49,8 +52,21 @@ export class AuthController {
     })
   }
 
+  /** Remembers a trusted browser. httpOnly, and only sent to /api/auth (sign-in and its settings). */
+  private setTrustedCookie(res: Response, token: string) {
+    res.cookie(TRUSTED_COOKIE, token, { httpOnly: true, sameSite: "lax", secure: this.config.cookieSecure, path: TRUSTED_COOKIE_PATH, maxAge: TRUSTED_BROWSER_MS })
+  }
+
+  private clearTrustedCookie(res: Response) {
+    res.clearCookie(TRUSTED_COOKIE, { httpOnly: true, sameSite: "lax", secure: this.config.cookieSecure, path: TRUSTED_COOKIE_PATH })
+  }
+
   /** Sets the cookie for a finished sign-in, or for one still waiting for its authenticator code. */
-  private finish(res: Response, result: { user: SessionUser; token: string } | { mfaRequired: true; token: string }) {
+  private finish(
+    res: Response,
+    result: ({ user: SessionUser; token: string } | { mfaRequired: true; token: string }) & { clearTrusted?: boolean },
+  ) {
+    if (result.clearTrusted) this.clearTrustedCookie(res)
     if ("mfaRequired" in result) {
       this.setCookie(res, result.token, true)
       return { mfaRequired: true as const }
@@ -79,7 +95,7 @@ export class AuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(@Req() req: Request, @Res({ passthrough: true }) res: Response, @ZodBody(loginSchema) body: z.infer<typeof loginSchema>) {
-    return this.finish(res, await this.auth.login(body.email, body.password, meta(req)))
+    return this.finish(res, await this.auth.login(body.email, body.password, meta(req), trustedToken(req)))
   }
 
   /** The second step of signing in: an authenticator code or a recovery code. */
@@ -94,11 +110,34 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @ZodBody(mfaVerifySchema) body: z.infer<typeof mfaVerifySchema>,
   ) {
-    const signedIn = await this.mfa.verify(user, session, body.code, meta(req))
+    const signedIn = await this.mfa.verify(user, session, body.code, meta(req), { trustBrowser: body.trustBrowser })
     // The cookie now lasts as long as a normal session.
     const token = (req.cookies as Record<string, string>)[SESSION_COOKIE]
     this.setCookie(res, token)
-    return { user: signedIn }
+    if (signedIn.trusted) this.setTrustedCookie(res, signedIn.trusted.token)
+    return { user: signedIn.user }
+  }
+
+  /** Browsers that skip the authenticator code at sign-in. */
+  @Get("trusted-browsers")
+  trustedBrowsers(@CurrentUser() user: Actor, @Req() req: Request) {
+    return this.trusted.list(user.id, trustedToken(req))
+  }
+
+  @Delete("trusted-browsers/:id")
+  async removeTrustedBrowser(@CurrentUser() user: Actor, @Param("id") id: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const removed = await this.trusted.remove(user.id, id, trustedToken(req))
+    if (removed.current) this.clearTrustedCookie(res)
+    await this.auth.recordForAccount(user, "Removed a trusted browser", removed.label, meta(req))
+    return { id }
+  }
+
+  @Delete("trusted-browsers")
+  async removeAllTrustedBrowsers(@CurrentUser() user: Actor, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const removed = await this.trusted.removeAll(user.id)
+    this.clearTrustedCookie(res)
+    if (removed > 0) await this.auth.recordForAccount(user, "Removed all trusted browsers", `${removed}`, meta(req))
+    return { removed }
   }
 
   @Get("mfa")

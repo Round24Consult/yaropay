@@ -237,6 +237,29 @@ export const passwordResets = pgTable(
   (t) => [uniqueIndex("password_resets_token_hash_key").on(t.tokenHash)],
 )
 
+/**
+ * Browsers someone chose to trust after entering their authenticator code: signing in again from one
+ * still needs the password, but not the code, until expires_at (fixed 30 days from creation). The cookie
+ * holds a random token; only its SHA-256 is stored. Changing or resetting the password, turning two-step
+ * sign-in off or resetting it, and disabling the account delete every row for that person.
+ */
+export const trustedBrowsers = pgTable(
+  "trusted_browsers",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    /** "Chrome on macOS": what the person sees in Settings → Security. */
+    label: text("label").notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: ts("last_used_at"),
+    expiresAt: ts("expires_at").notNull(),
+  },
+  (t) => [uniqueIndex("trusted_browsers_token_hash_key").on(t.tokenHash), index("trusted_browsers_user_idx").on(t.userId)],
+)
+
 export const connections = pgTable(
   "connections",
   {

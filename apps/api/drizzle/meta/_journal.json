@@ -92,6 +92,13 @@
       "when": 1794914780661,
       "tag": "0012_checkout_id",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794922270333,
+      "tag": "0013_trusted_browsers",
+      "breakpoints": true
     }
   ]
 }

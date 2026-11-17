@@ -7,7 +7,7 @@ A company installs YaroPay once, adds its payment gateway keys ([see the gateway
 - **Multi-product routing.** A gateway sends every event for an account to one URL. YaroPay matches each event to its product (by known reference, `metadata.yaropay_product`, then reference prefix) and forwards it to that product only. Events that match nothing are held as *unrouted*.
 - **Real gateway integrations.** Each gateway adapter starts payments, verifies them with the gateway, reads callbacks, checks webhook signatures and tests keys. See [Gateways](#gateways).
 - **Signed deliveries with retries.** Every event YaroPay forwards is signed (`x-yaropay-signature: t=…,v1=…`), retried 8 times over about 45 hours, and can be replayed from the dashboard.
-- **Auth, roles and product scope.** Email and password sign-in, invites, password reset, sessions you can revoke. Five roles (owner, admin, developer, finance, viewer), and members can be limited to some products.
+- **Auth, roles and product scope.** Email and password sign-in, two-step sign-in with an authenticator app (with an optional 30-day trusted browser), invites, password reset, sessions you can revoke. Five roles (owner, admin, developer, finance, viewer), and members can be limited to some products.
 - **Notifications.** In-app with a live bell (server-sent events), email, and an alerts webhook for Slack, Discord or Teams. Each member picks channels per event type.
 - **Dashboard.** Revenue by product, gateway split per product, transactions with a routing timeline, webhook deliveries, audit log. Light and dark, Test and Live modes.
 

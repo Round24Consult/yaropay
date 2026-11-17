@@ -158,6 +158,21 @@ export interface AuthState {
   signupEnabled: boolean
 }
 
+/** How long a browser stays trusted after the code is entered on it. Fixed: using it doesn't extend it. */
+export const TRUSTED_BROWSER_DAYS = 30
+
+/** A browser that skips the authenticator code at sign-in (Settings → Security). */
+export interface TrustedBrowser {
+  id: string
+  /** "Chrome on macOS" */
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+  expiresAt: string
+  /** The browser this list is being viewed in. */
+  current: boolean
+}
+
 export interface SessionInfo {
   id: string
   userAgent: string | null
@@ -256,7 +271,11 @@ const currentPassword = z.string().min(1, "Enter your password").max(128)
 const totp = z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from your app")
 
 /** The code step after signing in: a 6-digit authenticator code, or one of the recovery codes. */
-export const mfaVerifySchema = z.object({ code: z.string().trim().min(6, "Enter the code").max(32) })
+export const mfaVerifySchema = z.object({
+  code: z.string().trim().min(6, "Enter the code").max(32),
+  /** Skip the code on this browser for TRUSTED_BROWSER_DAYS (the password is still asked for). */
+  trustBrowser: z.boolean().optional(),
+})
 
 /** Starting setup asks for the password again, so an unattended browser can't add someone else's phone. */
 export const mfaSetupSchema = z.object({ password: currentPassword })

@@ -25,6 +25,7 @@ import type {
   MfaSetup,
   MfaStatus,
   SessionInfo,
+  TrustedBrowser,
   SessionUser,
   UpdateMemberInput,
 } from "@yaropay/core/auth"
@@ -162,6 +163,11 @@ export function useSessions() {
   return useQuery({ queryKey: qk.sessions, queryFn: () => api<SessionInfo[]>("/auth/sessions") })
 }
 
+/** Browsers that skip the authenticator code at sign-in. */
+export function useTrustedBrowsers(enabled = true) {
+  return useQuery({ queryKey: qk.trustedBrowsers, queryFn: () => api<TrustedBrowser[]>("/auth/trusted-browsers"), enabled })
+}
+
 export function useInvitePreview(token: string) {
   return useQuery({
     queryKey: qk.invitePreview(token),
@@ -194,7 +200,7 @@ export function useLogin() {
 export function useVerifyMfa() {
   const signedIn = useSignedIn()
   return useMutation({
-    mutationFn: (input: { code: string }) => api<{ user: SessionUser }>("/auth/mfa/verify", { method: "POST", json: input }),
+    mutationFn: (input: { code: string; trustBrowser?: boolean }) => api<{ user: SessionUser }>("/auth/mfa/verify", { method: "POST", json: input }),
     onSuccess: ({ user }) => signedIn(user),
   })
 }
@@ -317,6 +323,22 @@ export function useChangePassword() {
     mutationFn: (input: { currentPassword: string; newPassword: string }) =>
       api<{ ok: true }>("/auth/password", { method: "POST", json: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessions }),
+  })
+}
+
+export function useRemoveTrustedBrowser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<{ id: string }>(`/auth/trusted-browsers/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.trustedBrowsers }),
+  })
+}
+
+export function useRemoveAllTrustedBrowsers() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api<{ removed: number }>("/auth/trusted-browsers", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.trustedBrowsers }),
   })
 }
 
