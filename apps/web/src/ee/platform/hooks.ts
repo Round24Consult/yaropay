@@ -8,7 +8,10 @@ import type { Role } from "@yaropay/core/auth"
 import type {
   CreatedWorkspace,
   CreateWorkspaceInput,
+  OperatorCheckResult,
+  OperatorSettingKey,
   PlatformAuditEntry,
+  PlatformOperatorSettings,
   PlatformOverview,
   PlatformRates,
   PlatformSettings,
@@ -28,6 +31,7 @@ export const pk = {
   rates: ["platform", "rates"] as const,
   audit: ["platform", "audit"] as const,
   settings: ["platform", "settings"] as const,
+  operatorSettings: ["platform", "operator-settings"] as const,
   users: (params: object) => ["platform", "users", params] as const,
 }
 
@@ -165,6 +169,36 @@ export function useUpdatePlatformSettings() {
   return useMutation({
     mutationFn: (input: Partial<PlatformSettings>) => api<PlatformSettings>("/platform/settings", { method: "PATCH", json: input }),
     onSuccess: refresh,
+  })
+}
+
+// ---- Operator settings (Platform → Settings) ----
+
+export function useOperatorSettings() {
+  return useQuery({ queryKey: pk.operatorSettings, queryFn: () => api<PlatformOperatorSettings>("/platform/operator-settings"), retry })
+}
+
+export function useSetOperatorSetting() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: (input: { key: OperatorSettingKey; value: string | number }) =>
+      api<PlatformOperatorSettings>(`/platform/operator-settings/${input.key}`, { method: "PUT", json: { value: input.value } }),
+    onSuccess: refresh,
+  })
+}
+
+export function useClearOperatorSetting() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: (key: OperatorSettingKey) => api<PlatformOperatorSettings>(`/platform/operator-settings/${key}`, { method: "DELETE" }),
+    onSuccess: refresh,
+  })
+}
+
+/** "Send test email" or "Check billing key": reports whether it worked, changes nothing. */
+export function useOperatorCheck() {
+  return useMutation({
+    mutationFn: (check: "test-email" | "check-billing-key") => api<OperatorCheckResult>(`/platform/operator-settings/${check}`, { method: "POST" }),
   })
 }
 

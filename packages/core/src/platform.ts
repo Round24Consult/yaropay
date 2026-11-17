@@ -129,6 +129,105 @@ export const platformSettingsSchema = z
   .object({ signupsOpen: z.boolean().optional(), signupPlan: z.string().trim().min(1).max(40).optional() })
   .refine((v) => Object.keys(v).length > 0, "Nothing to update")
 
+// ---- Operator settings (Platform → Settings) ----
+
+/**
+ * Server settings the super admin can change from the console instead of the server's .env. A value
+ * saved in the console wins over the env value; clearing it goes back to the env value. Everything
+ * security-critical (encryption key, database, setup token, edition) stays env-only.
+ */
+export const OPERATOR_SETTINGS = ["billingPaystackSecretKey", "smtpUrl", "mailFrom", "v1RateLimitPerMinute"] as const
+export type OperatorSettingKey = (typeof OPERATOR_SETTINGS)[number]
+
+export interface OperatorSettingInfo {
+  label: string
+  description: string
+  /** The env variable it overrides. */
+  env: string
+  /** Secrets are write-only: the API only ever returns their last 4 characters. */
+  secret: boolean
+}
+
+export const OPERATOR_SETTING_INFO: Record<OperatorSettingKey, OperatorSettingInfo> = {
+  billingPaystackSecretKey: {
+    label: "Billing Paystack secret key",
+    description: "YaroPay's own Paystack account, used to charge companies' saved cards for their invoices. Without it, card payments are off.",
+    env: "BILLING_PAYSTACK_SECRET_KEY",
+    secret: true,
+  },
+  smtpUrl: {
+    label: "Email server (SMTP URL)",
+    description: "Where YaroPay sends email: invites, password resets, invoices and alerts. Without it, emails are only written to the server log.",
+    env: "SMTP_URL",
+    secret: true,
+  },
+  mailFrom: {
+    label: "Email sender",
+    description: 'The From address on every email, for example "YaroPay <no-reply@yaropay.com>".',
+    env: "MAIL_FROM",
+    secret: false,
+  },
+  v1RateLimitPerMinute: {
+    label: "Product API limit per company",
+    description: "Product API requests one company can make each minute, across all its products and keys. Over it, requests get 429.",
+    env: "V1_RATE_LIMIT_PER_MINUTE",
+    secret: false,
+  },
+}
+
+/** Where the value in use comes from: saved in the console, the server (its env or built-in default), or nowhere. */
+export type OperatorSettingSource = "console" | "server" | "unset"
+
+export interface OperatorSetting extends OperatorSettingInfo {
+  key: OperatorSettingKey
+  source: OperatorSettingSource
+  /** The value in use, for settings that aren't secret. Always null for secrets. */
+  value: string | null
+  /** The last 4 characters of a secret in use. Null for settings that aren't secret. */
+  last4: string | null
+}
+
+export interface PlatformOperatorSettings {
+  settings: OperatorSetting[]
+}
+
+/** The result of "Send test email" or "Check billing key". Nothing is changed. */
+export interface OperatorCheckResult {
+  ok: boolean
+  message: string
+}
+
+const isSmtpUrl = (v: string) => {
+  try {
+    const u = new URL(v)
+    return (u.protocol === "smtp:" || u.protocol === "smtps:") && u.hostname.length > 0
+  } catch {
+    return false
+  }
+}
+
+/** How each setting's value is checked before it's saved. */
+export const operatorSettingValueSchemas = {
+  billingPaystackSecretKey: z
+    .string()
+    .trim()
+    .regex(/^sk_(test|live)_[A-Za-z0-9_]{16,}$/, "Paste a Paystack secret key: it starts with sk_test_ or sk_live_"),
+  smtpUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(isSmtpUrl, "Enter an SMTP URL like smtp://user:password@smtp.example.com:587 (or smtps:// for port 465)"),
+  mailFrom: z
+    .string()
+    .trim()
+    .max(200)
+    .regex(/^(?:[^<>@\n]*<\s*)?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+\s*>?$/, 'Enter an address like no-reply@example.com or "YaroPay <no-reply@example.com>"'),
+  v1RateLimitPerMinute: z.coerce.number().int("Use a whole number").min(1, "Use at least 1").max(1_000_000, "Use at most 1,000,000"),
+} satisfies Record<OperatorSettingKey, z.ZodType>
+
+export const operatorSettingKeySchema = z.enum(OPERATOR_SETTINGS)
+export const setOperatorSettingSchema = z.object({ value: z.union([z.string(), z.number()]) })
+
 // ---- Companies, people and teams (super admin) ----
 
 const roleEnum = z.enum(["owner", "admin", "developer", "finance", "viewer"])

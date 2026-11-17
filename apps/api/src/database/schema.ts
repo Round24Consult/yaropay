@@ -93,6 +93,16 @@ export const settings = pgTable("settings", {
   signupsOpen: boolean("signups_open").notNull().default(false),
   /** Cloud: the plan (slug) a company created from the sign-up page starts on. */
   signupPlan: text("signup_plan").notNull().default("standard"),
+  /**
+   * Operator settings saved from the platform console (OperatorSettingsService). Each one, when set,
+   * wins over its env variable; null means "use the env value". Secrets are encrypted.
+   */
+  billingPaystackSecretKeyEnc: text("billing_paystack_secret_key_enc"),
+  smtpUrlEnc: text("smtp_url_enc"),
+  mailFrom: text("mail_from"),
+  v1RateLimitPerMinute: integer("v1_rate_limit_per_minute"),
+  /** Changes whenever an operator setting does, so every API instance knows to reload them. */
+  operatorUpdatedAt: ts("operator_updated_at"),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 })
 

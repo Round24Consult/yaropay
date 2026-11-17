@@ -23,6 +23,7 @@ const TABS = [
   { href: "/platform", label: "Companies" },
   { href: "/platform/people", label: "People" },
   { href: "/platform/pricing", label: "Plans & pricing" },
+  { href: "/platform/settings", label: "Settings" },
   { href: "/platform/audit", label: "Audit log" },
 ]
 

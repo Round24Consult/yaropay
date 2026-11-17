@@ -99,7 +99,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
         <PriceSummary version={plan.price} label="This month" />
         {plan.nextPrice && <PriceSummary version={plan.nextPrice} label={`From ${formatDate(plan.nextPrice.effectiveFrom)}`} />}
         <p className="text-xs text-muted-foreground">
-          {plan.features.length === FEATURES.length ? "All paid features" : plan.features.length ? plan.features.map((f) => FEATURE_INFO[f].label).join(", ") : "No paid features"}
+          {plan.features.length === FEATURES.length ? "All paid features" : plan.features.length ? plan.features.map((f) => FEATURE_INFO[f]?.label ?? f).join(", ") : "No paid features"}
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setDialog("price")} data-testid={`change-price-${plan.slug}`}>
