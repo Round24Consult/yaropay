@@ -1,0 +1,23 @@
+{
+  "status": true,
+  "message": "Charge retrieved successfully",
+  "data": {
+    "reference": "SHW_FIXTURE001",
+    "status": "success",
+    "amount": "15000.00",
+    "amount_paid": "15000.00",
+    "fee": "161.25",
+    "currency": "NGN",
+    "description": "Shopwise",
+    "card": {
+      "card_type": "mastercard",
+      "first_six": "539983",
+      "last_four": "8381",
+      "expiry": "10/31"
+    },
+    "metadata": {
+      "yaropay-product": "prd_fixture1",
+      "orderId": "1042"
+    }
+  }
+}
