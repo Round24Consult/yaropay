@@ -1,0 +1,108 @@
+# Production stack for the hosted edition. Lives in /opt/yaropay on the server next to
+# a server-only .env (written by bootstrap.sh, never committed). The deploy workflow copies
+# this file and the Caddyfile over and sets API_IMAGE / WEB_IMAGE to the commit being deployed.
+name: yaropay
+
+services:
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # yaropay.com and /docs, published by the yaropay-site and yaropay-docs repositories as the
+      # yaropay-www user, which can't read anything in /opt/yaropay.
+      - /srv/yaropay-www:/srv/www:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    image: ${WEB_IMAGE:?set WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    image: ${API_IMAGE:?set API_IMAGE}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://yaropay:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/yaropay
+      YAROPAY_ENCRYPTION_KEY: ${YAROPAY_ENCRYPTION_KEY:?set YAROPAY_ENCRYPTION_KEY in .env}
+      # Only while rotating the key (see the docs): the old key, still read but never written.
+      YAROPAY_ENCRYPTION_KEY_PREVIOUS: ${YAROPAY_ENCRYPTION_KEY_PREVIOUS:-}
+      # Only someone holding this token can create the first (owner) account.
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      DASHBOARD_URL: https://${APP_DOMAIN}
+      YAROPAY_BASE_URL: https://${APP_DOMAIN}
+      COOKIE_SECURE: "true"
+      # Requests reach the API through Caddy and the dashboard, both on the private Docker network.
+      TRUST_PROXY: loopback, uniquelocal
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-YaroPay <no-reply@yaropay.com>}
+      LOG_LEVEL: ${LOG_LEVEL:-log}
+      # YaroPay Cloud (app.yaropay.com) only: needs the paid build. Self-hosted installs leave it off.
+      YAROPAY_CLOUD: ${YAROPAY_CLOUD:-false}
+      # YaroPay Cloud: YaroPay's own Paystack secret key, for card payments of Cloud invoices.
+      BILLING_PAYSTACK_SECRET_KEY: ${BILLING_PAYSTACK_SECRET_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yaropay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: yaropay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaropay -d yaropay"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Nightly compressed dump into /opt/yaropay/backups, keeping BACKUP_KEEP_DAYS days.
+  # Copy that folder off the server (object storage) before taking real customers.
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: yaropay
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: yaropay
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          sleep 300
+          file=/backups/yaropay-$$(date -u +%Y%m%d-%H%M%S).dump
+          if pg_dump --format=custom --file="$$file.partial"; then mv "$$file.partial" "$$file"; echo "backup: $$file"; else rm -f "$$file.partial"; echo "backup failed" >&2; fi
+          find /backups -name 'yaropay-*.dump' -mtime +"$$KEEP_DAYS" -delete
+          sleep 86100
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

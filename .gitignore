@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# builds
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# local data (embedded database)
+.data/
+
+# testing
+coverage/
+test-results/
+playwright-report/
+apps/web/e2e/.auth/
+
+# env files
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel

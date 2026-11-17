@@ -1,0 +1,62 @@
+# Self-hosted YaroPay: Postgres, the API, the dashboard and a local mail catcher.
+#   cp .env.example .env   # then set YAROPAY_ENCRYPTION_KEY
+#   docker compose up -d --build
+# Dashboard: http://localhost:3000   Mail (invites, resets): http://localhost:8025
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: yaropay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaropay}
+      POSTGRES_DB: yaropay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaropay"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://yaropay:${POSTGRES_PASSWORD:-yaropay}@postgres:5432/yaropay
+      YAROPAY_ENCRYPTION_KEY: ${YAROPAY_ENCRYPTION_KEY:?Set YAROPAY_ENCRYPTION_KEY in .env (openssl rand -base64 32)}
+      # Set it on any install reachable from the internet: only someone holding it can create the owner account.
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:3000}
+      YAROPAY_BASE_URL: ${YAROPAY_BASE_URL:-http://localhost:3000}
+      SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
+      MAIL_FROM: ${MAIL_FROM:-YaroPay <no-reply@yaropay.local>}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
+      WEBHOOK_ALLOW_PRIVATE: ${WEBHOOK_ALLOW_PRIVATE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        YAROPAY_API_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

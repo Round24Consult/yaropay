@@ -1,0 +1,66 @@
+# Automatic HTTPS (Let's Encrypt) for the hosted edition.
+# APP_DOMAIN and SITE_DOMAIN come from the server's .env through compose.yml.
+
+{$APP_DOMAIN} {
+	# The product API, gateway webhooks and checkout callbacks go straight to the API, so taking payments
+	# never depends on the dashboard container. Everything else (pages and /api) goes through the dashboard.
+	@payments path /v1/*
+	handle @payments {
+		reverse_proxy api:4000
+	}
+	# No `encode` here: the dashboard compresses its own pages, and compressing the
+	# notification stream (server-sent events) would hold events back.
+	handle {
+		reverse_proxy web:3000
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+# yaropay.com is two static sites, each published by its own repository: yaropay-docs (public) serves
+# /docs, yaropay-site (private) everything else. Each publish lands in a new folder under
+# /srv/yaropay-www/<site>/releases on the server, and <site>/current points at the live one.
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	@assets path /_next/static/* /docs/_next/static/* /screenshots/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	@docs path /docs /docs/*
+	handle @docs {
+		root * /srv/www/docs/current
+		uri strip_prefix /docs
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+	handle {
+		root * /srv/www/site/current
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+
+	handle_errors {
+		@docs404 path /docs /docs/*
+		handle @docs404 {
+			root * /srv/www/docs/current
+			rewrite * /404.html
+			file_server
+		}
+		handle {
+			root * /srv/www/site/current
+			rewrite * /404.html
+			file_server
+		}
+	}
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}

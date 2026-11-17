@@ -1,0 +1,132 @@
+name: Deploy
+
+# Builds the API and dashboard images for a commit that passed CI on main, pushes them to
+# GitHub's container registry and restarts the stack on the server (deploy/compose.yml).
+# Stays off until the repository variable DEPLOY_HOST is set.
+#
+# Repository variables: DEPLOY_HOST (server IP), APP_DOMAIN (e.g. app.yaropay.com), DEPLOY_USER (default: deploy)
+# Repository secrets:   DEPLOY_SSH_KEY (private key of the `deploy` user), DEPLOY_KNOWN_HOSTS (the server's host keys),
+#                       EE_DEPLOY_KEY (read-only deploy key of the private yaropay-ee repository)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy (leave empty for the latest main). Use an older commit to roll back.
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE_PREFIX: ghcr.io/round24consult/yaropay
+  SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  images:
+    name: Build and push images
+    if: vars.DEPLOY_HOST != '' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+      # app.yaropay.com runs the paid build; the dashboard image doesn't need it.
+      - if: matrix.app == 'api'
+        uses: ./.github/actions/checkout-ee
+        with:
+          ssh-key: ${{ secrets.EE_DEPLOY_KEY }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          # The API build fails if the paid code is missing, rather than shipping Community by accident.
+          build-args: ${{ matrix.app == 'api' && 'EDITION=enterprise' || '' }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:${{ env.SHA }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:latest
+          # Links the package to this repository, so the deploy job's token can pull it.
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  deploy:
+    name: Restart the stack on the server
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER || 'deploy' }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+      - name: SSH access
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Copy stack files
+        run: scp -q deploy/compose.yml deploy/Caddyfile "$DEPLOY_USER@$HOST:/opt/yaropay/"
+      - name: Pull images and restart
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: |
+          # The workflow token is short-lived: log in, pull, log out.
+          printf '%s' "$REGISTRY_TOKEN" | ssh "$DEPLOY_USER@$HOST" "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin" >/dev/null
+          ssh "$DEPLOY_USER@$HOST" API_IMAGE="$IMAGE_PREFIX-api:$SHA" WEB_IMAGE="$IMAGE_PREFIX-web:$SHA" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/yaropay
+          # A backup right before every deploy, so a migration can always be undone. Keeps the last 10.
+          # (`< /dev/null`: this script itself arrives on stdin, and `exec` would swallow the rest of it.)
+          if docker compose ps --status running --services | grep -qx postgres; then
+            docker compose exec -T postgres pg_dump -U yaropay -Fc yaropay > "backups/pre-deploy-$(date -u +%Y%m%d-%H%M%S).dump" < /dev/null
+            ls -1t backups/pre-deploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f
+          fi
+          # Record the deployed images in .env, so `docker compose` works by hand on the server too.
+          sed -i '/^API_IMAGE=/d;/^WEB_IMAGE=/d' .env
+          printf 'API_IMAGE=%s\nWEB_IMAGE=%s\n' "$API_IMAGE" "$WEB_IMAGE" >> .env
+          docker compose pull --quiet
+          docker compose up -d --remove-orphans --wait --wait-timeout 180
+          # Apply Caddyfile changes even when the Caddy container itself didn't change.
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile < /dev/null
+          docker logout ghcr.io >/dev/null
+          docker image prune -f >/dev/null
+          docker compose ps --format 'table {{.Service}}\t{{.Status}}'
+          REMOTE
+      - name: Check the app and the website answer
+        if: env.APP_DOMAIN != ''
+        env:
+          SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
+        run: |
+          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors -o /dev/null -w "https://$APP_DOMAIN/login answered %{http_code}\n" "https://$APP_DOMAIN/login"
+          if [ -n "$SITE_DOMAIN" ]; then
+            curl -fsS --retry 12 --retry-delay 5 --retry-all-errors -o /dev/null -w "https://$SITE_DOMAIN/docs answered %{http_code}\n" "https://$SITE_DOMAIN/docs"
+          fi

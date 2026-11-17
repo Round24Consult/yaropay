@@ -1,0 +1,21 @@
+name: Check out the paid build
+description: Fetches the private yaropay-ee submodule into apps/api/src/ee with a read-only deploy key.
+inputs:
+  ssh-key:
+    description: Private deploy key with read access to Round24Consult/yaropay-ee (secret EE_DEPLOY_KEY)
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        KEY: ${{ inputs.ssh-key }}
+      run: |
+        if [ -z "$KEY" ]; then echo "::error::EE_DEPLOY_KEY is not set"; exit 1; fi
+        install -m 700 -d ~/.ssh
+        (umask 077 && printf '%s\n' "$KEY" > ~/.ssh/yaropay_ee)
+        # GitHub's published host key (https://api.github.com/meta), so nothing is trusted on first use.
+        echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+        GIT_SSH_COMMAND="ssh -i ~/.ssh/yaropay_ee -o IdentitiesOnly=yes" git submodule update --init apps/api/src/ee
+        rm -f ~/.ssh/yaropay_ee
+        test -f apps/api/src/ee/index.ts
