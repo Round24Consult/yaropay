@@ -13,7 +13,7 @@ import {
   header,
   type InitializeParams,
   type ParsedWebhook,
-} from "./types.js"
+} from "../kit.js"
 
 interface PaystackEnvelope<T> {
   status: boolean
@@ -114,7 +114,7 @@ export const paystackAdapter: GatewayAdapter = {
   },
 
   /** `x-paystack-signature` is the HMAC-SHA512 of the raw body, keyed with the secret key. */
-  verifySignature(creds, rawBody, headers) {
+  async verifySignature(_ctx, creds, rawBody, headers) {
     const given = header(headers, "x-paystack-signature")
     if (!given || !creds.secretKey) return false
     return safeEqual(hmacHex("sha512", creds.secretKey, rawBody), given.toLowerCase())

@@ -1,9 +1,11 @@
+import { SUPPORTED_CURRENCIES } from "@yaropay/core/gateways/registry"
 import { parseAsArrayOf, parseAsInteger, parseAsString, parseAsStringLiteral } from "nuqs"
 
 /** URL query-state parsers shared by the dashboard, transactions and webhooks pages. */
 export const periodValues = ["today", "7d", "30d", "90d", "ytd", "12m", "custom"] as const
 export const granularityValues = ["day", "week", "month"] as const
-export const currencyValues = ["NGN", "USD", "GHS", "KES", "ZAR"] as const
+/** Currencies the installed gateways accept. */
+export const currencyValues = SUPPORTED_CURRENCIES
 
 export const dashboardFilters = {
   period: parseAsStringLiteral(periodValues).withDefault("30d"),

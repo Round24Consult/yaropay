@@ -97,14 +97,8 @@ export async function POST(req) {
 }`
 }
 
-export function directModeSnippet(opts: { callbackUrl: string; productId: string; prefix: string }) {
-  return `// Direct mode: you call Paystack yourself. Keep YaroPay in the loop by
-// using its callback URL, a ${opts.prefix}_ reference and the product metadata.
-await paystack.transaction.initialize({
-  email: customer.email,
-  amount: 1500000,
-  reference: "${opts.prefix}_" + crypto.randomUUID().slice(0, 10).toUpperCase(),
-  callback_url: "${opts.callbackUrl}",
-  metadata: { ${PRODUCT_METADATA_KEY}: "${opts.productId}" },
-})`
+/** Fills a gateway definition's `directModeExample` with this product's values. */
+export function directModeSnippet(template: string, opts: { callbackUrl: string; productId: string; prefix: string }) {
+  const values: Record<string, string> = { ...opts, metadataKey: PRODUCT_METADATA_KEY }
+  return template.replace(/\{\{(\w+)\}\}/g, (whole, key: string) => values[key] ?? whole)
 }

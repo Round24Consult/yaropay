@@ -1,4 +1,5 @@
 import type { ProductEvent } from "@yaropay/core/payments"
+import { toMajorUnits } from "@yaropay/core/currencies"
 import { makeReference, PRODUCT_METADATA_KEY } from "@yaropay/core/routing"
 import type { CurrencyCode, GatewayId, Mode, PaymentChannel, TransactionStatus } from "@yaropay/core/types"
 import type { TimelineStepJson } from "../database/schema.js"
@@ -206,7 +207,7 @@ function buildPayment(rng: Rng, product: DemoProduct, connection: DemoConnection
           event: type,
           data: {
             id: Number(gatewayTransactionId),
-            ...(gatewayId === "paystack" ? { reference, amount, status: "success" } : { tx_ref: reference, amount: amount / 100, status: "successful" }),
+            ...(gatewayId === "paystack" ? { reference, amount, status: "success" } : { tx_ref: reference, amount: toMajorUnits(amount, currency), status: "successful" }),
             currency,
             channel,
             customer: { email: customer.email },

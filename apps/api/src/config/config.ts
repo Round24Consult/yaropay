@@ -1,3 +1,6 @@
+import { GATEWAY_IDS, GATEWAYS } from "@yaropay/core/gateways/registry"
+import { gatewayApiBaseUrl } from "@yaropay/core/gateways/types"
+import type { GatewayId } from "@yaropay/core/types"
 import { z } from "zod"
 
 const bool = (fallback: boolean) =>
@@ -47,8 +50,6 @@ const env = z.object({
   RATE_LIMIT: z.string().optional(),
   /** Product API requests one company may make per minute, across all its products and keys. */
   V1_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(1200),
-  PAYSTACK_API_URL: z.string().url().default("https://api.paystack.co"),
-  FLUTTERWAVE_API_URL: z.string().url().default("https://api.flutterwave.com"),
   GATEWAY_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(15_000),
   LOG_LEVEL: z.enum(["error", "warn", "log", "debug", "verbose"]).default("log"),
   /** The hosted edition (app.yaropay.com). Needs the paid build. */
@@ -86,7 +87,13 @@ export interface AppConfig {
   rateLimit: boolean
   /** Per-company product API limit (requests a minute); applies when rateLimit is on. */
   v1RateLimitPerMinute: number
-  gateways: { paystackUrl: string; flutterwaveUrl: string; timeoutMs: number }
+  gateways: {
+    timeoutMs: number
+    /** API base URLs operators set with `<ID>_API_URL` (PAYSTACK_API_URL, ...), used instead of the gateway's own. */
+    apiUrls: Partial<Record<GatewayId, string>>
+    /** Paystack's live API: Cloud billing charges cards through YaroPay's own Paystack account. */
+    paystackUrl: string
+  }
   logLevel: "error" | "warn" | "log" | "debug" | "verbose"
   /** Run as YaroPay Cloud. Refuses to start without the paid build. */
   cloud: boolean
@@ -98,6 +105,19 @@ export interface AppConfig {
 // Kept from the project's first name: changing it would make data that existing development installs encrypted with it unreadable.
 const DEV_KEY = Buffer.from("payroute-development-only-key!!!", "utf8")
 
+/** `<ID>_API_URL` overrides for every gateway in the registry, e.g. PAYSTACK_API_URL. */
+function gatewayApiUrls(source: NodeJS.ProcessEnv): Partial<Record<GatewayId, string>> {
+  const out: Partial<Record<GatewayId, string>> = {}
+  for (const id of GATEWAY_IDS) {
+    const name = `${id.toUpperCase()}_API_URL`
+    const value = source[name]?.trim()
+    if (!value) continue
+    if (!z.url().safeParse(value).success) throw new Error(`${name} must be a URL, for example https://api.example.com`)
+    out[id] = value.replace(/\/+$/, "")
+  }
+  return out
+}
+
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = env.safeParse(source)
   if (!parsed.success) {
@@ -105,6 +125,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment:\n${lines}`)
   }
   const e = parsed.data
+  const apiUrls = gatewayApiUrls(source)
   const isProduction = e.NODE_ENV === "production"
 
   const previousEncryptionKeys = (e.YAROPAY_ENCRYPTION_KEY_PREVIOUS ?? "")
@@ -161,9 +182,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimit: bool(e.NODE_ENV !== "test").parse(e.RATE_LIMIT),
     v1RateLimitPerMinute: e.V1_RATE_LIMIT_PER_MINUTE,
     gateways: {
-      paystackUrl: e.PAYSTACK_API_URL.replace(/\/+$/, ""),
-      flutterwaveUrl: e.FLUTTERWAVE_API_URL.replace(/\/+$/, ""),
       timeoutMs: e.GATEWAY_TIMEOUT_MS,
+      apiUrls,
+      paystackUrl: apiUrls.paystack ?? gatewayApiBaseUrl(GATEWAYS.paystack, "live"),
     },
     logLevel: e.LOG_LEVEL,
     cloud: bool(false).parse(e.YAROPAY_CLOUD),

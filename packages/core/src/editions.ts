@@ -14,7 +14,6 @@ export const FEATURES = [
   "audit_export",
   "sso",
   "enforce_2fa",
-  "more_gateways",
   "refunds",
   "reconciliation",
   "scheduled_reports",
@@ -23,13 +22,24 @@ export const FEATURES = [
 
 export type Feature = (typeof FEATURES)[number]
 
+export function isFeature(v: unknown): v is Feature {
+  return typeof v === "string" && (FEATURES as readonly string[]).includes(v)
+}
+
+/**
+ * Features named in a licence or plan, minus any this build doesn't know. Licences outlive releases:
+ * a feature can be renamed or become free (gateways did), and an old key must keep working.
+ */
+export function knownFeatures(values: readonly unknown[]): Feature[] {
+  return [...new Set(values.filter(isFeature))]
+}
+
 export const FEATURE_INFO: Record<Feature, { label: string; description: string }> = {
   multi_workspace: { label: "Several companies", description: "Run more than one company on one install, each with its own gateways, products, team and settings." },
   custom_roles: { label: "Custom roles", description: "Build roles from individual permissions instead of the five built-in ones." },
   audit_export: { label: "Audit log export", description: "Filter, export and keep the audit log for as long as you need." },
   sso: { label: "Single sign-on", description: "Sign in with Google Workspace, Microsoft Entra or any OpenID Connect provider." },
   enforce_2fa: { label: "Required two-step sign-in", description: "Make two-step verification mandatory for everyone in the company." },
-  more_gateways: { label: "More gateways", description: "Stripe, Monnify, Korapay and others alongside Paystack and Flutterwave." },
   refunds: { label: "Refunds", description: "Refund payments from the dashboard and tell the product about it." },
   reconciliation: { label: "Settlement reconciliation", description: "Match gateway settlements against payments and spot what is missing." },
   scheduled_reports: { label: "Scheduled reports", description: "Email payment reports to finance on a schedule." },

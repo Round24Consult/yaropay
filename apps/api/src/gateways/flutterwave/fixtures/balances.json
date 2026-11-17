@@ -1,0 +1,11 @@
+{
+  "status": "success",
+  "message": "Wallet balances fetched",
+  "data": [
+    {
+      "currency": "GHS",
+      "available_balance": 0,
+      "ledger_balance": 0
+    }
+  ]
+}

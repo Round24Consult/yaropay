@@ -22,6 +22,7 @@
     "db:generate": "npm run db:generate -w @yaropay/api",
     "db:migrate": "npm run db:migrate -w @yaropay/api",
     "db:seed": "npm run db:seed -w @yaropay/api",
+    "gateway:new": "node scripts/new-gateway.mjs",
     "screenshots": "SITE_SCREENSHOTS=\"${SITE_SCREENSHOTS:-$PWD/../yaropay-site/public/screenshots}\" npm run e2e -w @yaropay/web -- e2e/site-screenshots.spec.ts --project=desktop"
   },
   "devDependencies": {

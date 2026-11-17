@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { AVAILABLE_GATEWAY_IDS, SUPPORTED_CURRENCIES } from "./gateways/registry.ts"
 import type { CurrencyCode, GatewayId, Mode, PaymentChannel, TransactionStatus } from "./types.ts"
 
 /**
@@ -18,11 +19,12 @@ export function modeOfApiKey(key: string): Mode | null {
 export const createPaymentSchema = z.object({
   /** Minor units: kobo, cents, pesewas. */
   amount: z.number().int("Amount must be in minor units (an integer)").positive().max(1_000_000_000_000),
-  currency: z.enum(["NGN", "USD", "GHS", "KES", "ZAR"]),
+  /** Any currency an installed gateway accepts; the chosen gateway must accept it too. */
+  currency: z.enum(SUPPORTED_CURRENCIES as [CurrencyCode, ...CurrencyCode[]]),
   email: z.string().trim().toLowerCase().pipe(z.email("Enter the customer's email address")),
   name: z.string().trim().max(120).optional(),
   /** `default` (or omitted) uses the product's default gateway for the key's mode. */
-  gateway: z.enum(["default", "paystack", "flutterwave"]).optional(),
+  gateway: z.union([z.literal("default"), z.enum(AVAILABLE_GATEWAY_IDS as [GatewayId, ...GatewayId[]])]).optional(),
   /** Optional reference. It must start with the product prefix, e.g. `SHW_ORDER1042`. */
   reference: z
     .string()

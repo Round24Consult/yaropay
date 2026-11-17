@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { buildCredentialSchema, maskCredentials, maskSecret } from "./gateways/credentials.ts"
-import { flutterwave, gatewayRegistry, paystack } from "./gateways/registry.ts"
+import { flutterwave } from "./gateways/flutterwave/definition.ts"
+import { paystack } from "./gateways/paystack/definition.ts"
+import { gatewayRegistry } from "./gateways/registry.ts"
 
 describe("credential schema", () => {
   it("accepts test keys in test mode", () => {

@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "Authorization URL created",
+  "data": {
+    "authorization_url": "https://checkout.paystack.com/fx0w8a2kq7lz1r3",
+    "access_code": "fx0w8a2kq7lz1r3",
+    "reference": "SHW_FIXTURE001"
+  }
+}

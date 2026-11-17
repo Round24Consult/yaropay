@@ -1,20 +1,17 @@
-import type { CurrencyCode } from "./types.ts"
+import { type CurrencyCode, currencyInfo, minorUnitExponent, toMajorUnits, toMinorUnits } from "./currencies.ts"
+import { SUPPORTED_CURRENCIES } from "./gateways/registry.ts"
 
-export const CURRENCIES: { code: CurrencyCode; name: string; locale: string }[] = [
-  { code: "NGN", name: "Nigerian naira", locale: "en-NG" },
-  { code: "USD", name: "US dollar", locale: "en-US" },
-  { code: "GHS", name: "Ghanaian cedi", locale: "en-GH" },
-  { code: "KES", name: "Kenyan shilling", locale: "en-KE" },
-  { code: "ZAR", name: "South African rand", locale: "en-ZA" },
-]
+/** Currencies the installed gateways accept, for currency pickers and filters. */
+export const CURRENCIES: { code: CurrencyCode; name: string }[] = SUPPORTED_CURRENCIES.map((code) => ({ code, name: currencyInfo(code).name }))
 
-/** All supported currencies use 2 minor digits. */
-export function toMajor(minor: number): number {
-  return minor / 100
+/** Minor units to major units, using the currency's own decimal places. */
+export function toMajor(minor: number, currency: CurrencyCode): number {
+  return toMajorUnits(minor, currency)
 }
 
-export function toMinor(major: number): number {
-  return Math.round(major * 100)
+/** Major units to whole minor units, using the currency's own decimal places. */
+export function toMinor(major: number, currency: CurrencyCode): number {
+  return toMinorUnits(major, currency)
 }
 
 const cache = new Map<string, Intl.NumberFormat>()
@@ -28,8 +25,8 @@ function formatter(currency: CurrencyCode, compact: boolean, decimals: boolean) 
       currency,
       currencyDisplay: "narrowSymbol",
       notation: compact ? "compact" : "standard",
-      maximumFractionDigits: compact ? 1 : decimals ? 2 : 0,
-      minimumFractionDigits: compact ? 0 : decimals ? 2 : 0,
+      maximumFractionDigits: compact ? 1 : decimals ? minorUnitExponent(currency) : 0,
+      minimumFractionDigits: compact ? 0 : decimals ? minorUnitExponent(currency) : 0,
     })
     cache.set(key, f)
   }
@@ -43,7 +40,7 @@ export function formatMoney(
   opts: { compact?: boolean; decimals?: boolean } = {},
 ): string {
   const { compact = false, decimals = true } = opts
-  return formatter(currency, compact, decimals).format(toMajor(minor))
+  return formatter(currency, compact, decimals).format(toMajor(minor, currency))
 }
 
 const numberCompact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })

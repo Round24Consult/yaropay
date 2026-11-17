@@ -1,4 +1,6 @@
 import type { Role } from "./auth.ts"
+import type { CurrencyCode } from "./currencies.ts"
+import type { GatewayId } from "./gateways/registry.ts"
 
 /**
  * Domain types shared by the dashboard and the NestJS API. Nothing in
@@ -7,9 +9,11 @@ import type { Role } from "./auth.ts"
 
 export type Mode = "test" | "live"
 
-export type CurrencyCode = "NGN" | "USD" | "GHS" | "KES" | "ZAR"
+/** ISO 4217 code; the table with each currency's decimal places is in currencies.ts. */
+export type { CurrencyCode } from "./currencies.ts"
 
-export type GatewayId = "paystack" | "flutterwave" | "stripe" | "monnify" | "korapay"
+/** A gateway in the registry (gateways/registry.ts), one folder per gateway. */
+export type { GatewayId } from "./gateways/registry.ts"
 
 export type TransactionStatus = "success" | "failed" | "abandoned" | "pending" | "reversed"
 

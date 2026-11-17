@@ -1,0 +1,73 @@
+import type { GatewayDefinition } from "../types.ts"
+
+export const flutterwave: GatewayDefinition<"flutterwave"> = {
+  id: "flutterwave",
+  name: "Flutterwave",
+  tagline: "Pan-African payments with cards, mobile money and bank transfer",
+  description:
+    "Accept payments in over 30 currencies. YaroPay sets the redirect URL and tx_ref per product and reads the status Flutterwave appends to decide where to send the customer.",
+  status: "available",
+  monogram: "FW",
+  website: "https://flutterwave.com",
+  docsUrl: "https://developer.flutterwave.com/docs",
+  credentialFields: [
+    {
+      key: "publicKey",
+      label: "Public key",
+      type: "text",
+      required: true,
+      placeholder: "FLWPUBK_TEST-xxxxxxxxxxxxxxxx-X",
+      prefix: { test: "FLWPUBK_TEST-", live: "FLWPUBK-" },
+      minLength: 20,
+    },
+    {
+      key: "secretKey",
+      label: "Secret key",
+      type: "secret",
+      required: true,
+      placeholder: "FLWSECK_TEST-xxxxxxxxxxxxxxxx-X",
+      prefix: { test: "FLWSECK_TEST-", live: "FLWSECK-" },
+      minLength: 20,
+    },
+    {
+      key: "encryptionKey",
+      label: "Encryption key",
+      type: "secret",
+      required: true,
+      placeholder: "From Settings > API keys",
+      minLength: 12,
+      help: "Needed for direct card charges.",
+    },
+    {
+      key: "secretHash",
+      label: "Webhook secret hash",
+      type: "secret",
+      required: true,
+      placeholder: "A long random string",
+      minLength: 16,
+      help: "Enter the same value in Flutterwave under Settings, then Webhooks. It comes back in the verif-hash header.",
+    },
+  ],
+  redirects: {
+    callback: true,
+    cancel: false,
+    callbackField: "redirect_url",
+    statusParam: "status",
+  },
+  webhook: {
+    signatureHeader: "verif-hash",
+    scheme: "Shared secret hash, compared in constant time",
+    secretField: "secretHash",
+    note: "Flutterwave sends your secret hash in the verif-hash header. Events without a matching hash are rejected.",
+    endpointsPerAccount: "one",
+  },
+  currencies: ["NGN", "USD", "GHS", "KES", "ZAR"],
+  channels: ["card", "bank_transfer", "ussd", "mobile_money"],
+  dashboardSetupSteps: [
+    "Open the Flutterwave Dashboard and go to Settings, then Webhooks.",
+    "Paste the webhook URL below into the URL field.",
+    "Enter the same secret hash you saved here.",
+    "Save. Cancelled and failed payments come back through the per-product callback with status=cancelled or status=failed.",
+  ],
+  api: { baseUrl: "https://api.flutterwave.com" },
+}

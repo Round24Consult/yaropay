@@ -1,4 +1,6 @@
 import { z } from "zod"
+import type { CurrencyCode } from "./currencies.ts"
+import { SUPPORTED_CURRENCIES } from "./gateways/registry.ts"
 import { isValidPrefix } from "./routing.ts"
 import { isHttpUrl, isHttpsUrl, isRedirectTarget } from "./urls.ts"
 
@@ -70,7 +72,7 @@ export const settingsSchema = z.object({
     .string()
     .trim()
     .refine(isHttpUrl, "Use the full public URL, e.g. https://payments.company.com"),
-  defaultCurrency: z.enum(["NGN", "USD", "GHS", "KES", "ZAR"]),
+  defaultCurrency: z.enum(SUPPORTED_CURRENCIES as [CurrencyCode, ...CurrencyCode[]]),
   /** Empty string or null clears it. A masked value (with •) leaves it unchanged. */
   alertsWebhookUrl: z
     .string()

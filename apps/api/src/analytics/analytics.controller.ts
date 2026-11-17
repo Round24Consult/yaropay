@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common"
+import { isCurrencyCode } from "@yaropay/core/currencies"
 import { defaultGranularity, type Granularity, type OverviewQuery, type PeriodPreset, resolvePeriod } from "@yaropay/core/analytics"
 import type { CurrencyCode, GatewayId } from "@yaropay/core/types"
 import { CurrentUser, RequirePermissions } from "../auth/decorators.js"
@@ -9,7 +10,6 @@ import { SettingsService } from "../settings/settings.service.js"
 import { AnalyticsService } from "./analytics.service.js"
 
 const GRANULARITIES = new Set(["day", "week", "month"])
-const CURRENCIES = new Set(["NGN", "USD", "GHS", "KES", "ZAR"])
 const PRESETS = new Set(["today", "7d", "30d", "90d", "ytd", "12m", "custom"])
 
 @Controller("api/analytics")
@@ -31,7 +31,7 @@ export class AnalyticsController {
       ...range,
       products: list(q, "product"),
       gateways: list(q, "gateway") as GatewayId[],
-      currency: (CURRENCIES.has(currency) ? currency : "NGN") as CurrencyCode,
+      currency: isCurrencyCode(currency) ? currency : "NGN",
       granularity: (g && GRANULARITIES.has(g) ? g : defaultGranularity(range.from, range.to)) as Granularity,
       mode: modeOf(q),
     }

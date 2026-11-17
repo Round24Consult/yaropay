@@ -332,6 +332,8 @@ export const transactions = pgTable(
     customerName: text("customer_name").notNull().default(""),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     gatewayTransactionId: text("gateway_transaction_id"),
+    /** The gateway's id for the checkout YaroPay created (Stripe session, PayPal order), when it gave one. */
+    checkoutId: text("checkout_id"),
     authorizationUrl: text("authorization_url"),
     idempotencyKey: text("idempotency_key"),
     timeline: jsonb("timeline").$type<TimelineStepJson[]>().notNull().default([]),

@@ -103,7 +103,7 @@ curl https://payments.example.com/v1/products/prd_x/payments \
   -d '{ "amount": 1500000, "currency": "NGN", "email": "customer@example.com", "metadata": { "orderId": "1042" } }'
 ```
 
-`amount` is in minor units (kobo, cents). Optional: `name`, `gateway` (`default`, `paystack`, `flutterwave`), `reference` (must start with the product prefix), `channels`. The response has `reference`, `authorizationUrl` and `status`. Repeating a request with the same `Idempotency-Key` returns the same payment. `GET /v1/products/{productId}/payments/{reference}?refresh=1` re-checks a pending payment with the gateway.
+`amount` is in minor units of the currency (kobo, cents; yen have none). Optional: `name`, `gateway` (`default` or an installed gateway's id, such as `paystack` or `flutterwave`), `reference` (must start with the product prefix), `channels`. The response has `reference`, `authorizationUrl` and `status`. Repeating a request with the same `Idempotency-Key` returns the same payment. `GET /v1/products/{productId}/payments/{reference}?refresh=1` re-checks a pending payment with the gateway.
 
 **After checkout** the customer lands on your success, failure or cancel page with `?reference=…&status=success|failed|cancelled|pending&payment_id=…`. Treat the redirect as a hint and fulfil orders from the webhook.
 
@@ -185,7 +185,7 @@ API (`apps/api`, see `apps/api/.env.example`):
 | `WEBHOOK_ALLOW_PRIVATE` | on in dev, off in production | Allow product webhook URLs on private networks |
 | `WORKERS` | on | Delivery and outbox workers. Several API instances can share them. |
 | `RATE_LIMIT` | on | Per-IP limits on sign-in, reset and invite endpoints |
-| `PAYSTACK_API_URL`, `FLUTTERWAVE_API_URL` | official APIs | Override for proxies or sandboxes |
+| `<ID>_API_URL` (`PAYSTACK_API_URL`, `FLUTTERWAVE_API_URL`, ...) | the gateway's own API | Send one gateway's API calls through a proxy or to another host |
 
 Dashboard (`apps/web`): `YAROPAY_API_URL` (default `http://localhost:4000`). The dashboard proxies `/api` and `/v1` to the API so the session cookie stays first-party. Next.js compiles rewrites at build time, so set it before `next build` (the Dockerfile takes it as a build argument).
 
@@ -205,11 +205,12 @@ packages/core/       framework-free domain code shared by API and dashboard
   src/auth.ts          roles, permissions, auth schemas
   src/notifications.ts notification catalogue
   src/payments.ts      public API schemas, product events, signature format
-  src/gateways/        gateway registry (drives the install forms), credential schemas
+  src/gateways/        one folder per gateway (its definition drives the install forms), registry, credential schemas
+  src/currencies.ts    ISO 4217 currencies and their decimal places
   src/urls.ts, routing.ts, analytics.ts, api.ts
 apps/api/            NestJS 12 API (ESM)
   src/auth, team       sessions, guards, invites, roles, product scope
-  src/gateways         Paystack and Flutterwave adapters, gateway accounts
+  src/gateways         one folder per gateway adapter (with its contract tests and fixtures), the gateway kit, gateway accounts
   src/payments         product API, callbacks, gateway webhook ingestion, settlement
   src/webhooks         signed deliveries, retry worker, events
   src/notifications    in-app + SSE, email, alerts, outbox
@@ -237,13 +238,13 @@ npm run db:migrate
 
 ## Adding a gateway
 
-1. Add a `GatewayDefinition` to `packages/core/src/gateways/registry.ts`: credential fields with test/live prefixes, redirect behaviour, webhook verification, currencies, channels and setup steps. The Apps page, install form, product wizard and integration tab pick it up.
-2. Implement `GatewayAdapter` (`apps/api/src/gateways/adapters/types.ts`): `initialize`, `verify`, `verifySignature`, `parseWebhook`, `parseCallback`, `testConnection`, and register it in `adapters/index.ts`.
-3. Add its fake to `apps/api/test/fake-network.ts` and a flow test.
+Every gateway is free in every edition, and new ones are welcome. `npm run gateway:new -- <id> "<Name>"`
+creates the two files to fill in (the definition and the server adapter) with a contract test and a
+fixtures folder, and registers them. [docs/adding-a-gateway.md](docs/adding-a-gateway.md) walks through it.
 
 ## Not yet
 
-Refunds from the dashboard, two-factor sign-in, custom roles, several companies per install, Flutterwave v4 (OAuth), Stripe, Monnify and Korapay adapters, an OpenAPI document.
+Refunds from the dashboard, custom roles, several companies per install, Flutterwave v4 (OAuth), Stripe, PayPal, Monnify and Korapay adapters (next), an OpenAPI document.
 
 ## Editions and the paid build
 

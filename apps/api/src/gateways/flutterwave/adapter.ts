@@ -1,3 +1,4 @@
+import { toMajorUnits, toMinorUnits } from "@yaropay/core/currencies"
 import type { PaymentChannel, TransactionStatus } from "@yaropay/core/types"
 import { safeEqual } from "../../common/crypto.js"
 import {
@@ -13,7 +14,7 @@ import {
   header,
   type InitializeParams,
   type ParsedWebhook,
-} from "./types.js"
+} from "../kit.js"
 
 interface FlwEnvelope<T> {
   status: "success" | "error"
@@ -69,19 +70,17 @@ const PAYMENT_OPTIONS: Record<PaymentChannel, string> = {
   qr: "nqr",
 }
 
-/** Flutterwave amounts are in major units; YaroPay stores minor units. */
-const toMinor = (major: unknown) => Math.round(Number(major ?? 0) * 100)
-const toMajor = (minor: number) => minor / 100
-
 function toPayment(t: FlwTransaction): GatewayPayment {
   const status = flutterwaveStatus(t.status)
+  const currency = asCurrency(t.currency)
   return {
     reference: t.tx_ref,
     status,
-    amount: toMinor(t.amount),
-    currency: asCurrency(t.currency),
+    // Flutterwave amounts are in major units; YaroPay stores minor units.
+    amount: toMinorUnits(Number(t.amount ?? 0), currency),
+    currency,
     channel: flutterwaveChannel(t.payment_type),
-    fee: toMinor(t.app_fee),
+    fee: toMinorUnits(Number(t.app_fee ?? 0), currency),
     paidAt: status === "success" ? (t.created_at ?? null) : null,
     gatewayTransactionId: t.id != null ? String(t.id) : null,
     customer: { email: t.customer?.email ?? "", name: t.customer?.name ?? "" },
@@ -111,7 +110,7 @@ export const flutterwaveAdapter: GatewayAdapter = {
       secret: creds.secretKey,
       body: {
         tx_ref: p.reference,
-        amount: toMajor(p.amount),
+        amount: toMajorUnits(p.amount, p.currency),
         currency: p.currency,
         redirect_url: p.callbackUrl,
         customer: { email: p.email, ...(p.name ? { name: p.name } : {}) },
@@ -140,7 +139,7 @@ export const flutterwaveAdapter: GatewayAdapter = {
   },
 
   /** Flutterwave echoes the secret hash you configured in the `verif-hash` header. */
-  verifySignature(creds, _rawBody, headers) {
+  async verifySignature(_ctx, creds, _rawBody, headers) {
     const given = header(headers, "verif-hash")
     if (!given || !creds.secretHash) return false
     return safeEqual(given, creds.secretHash)

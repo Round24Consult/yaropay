@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common"
 import type { ConnectionDetail, ConnectionTestResult, GatewayListItem } from "@yaropay/core/api"
 import { buildCredentialSchema, type ConnectionInput, maskCredentials } from "@yaropay/core/gateways/credentials"
 import { gatewayRegistry, getGateway, requireGateway } from "@yaropay/core/gateways/registry"
+import { gatewayApiBaseUrl } from "@yaropay/core/gateways/types"
 import type { ColorSlot, GatewayConnection, GatewayId, Mode } from "@yaropay/core/types"
 import { and, asc, eq, sql } from "drizzle-orm"
 import { AuditService } from "../audit/audit.service.js"
@@ -15,8 +16,8 @@ import { DB } from "../database/database.module.js"
 import type { Db, DbOrTx } from "../database/db.js"
 import { type ConnectionRow, connections, productGateways, products } from "../database/schema.js"
 import { NotificationsService } from "../notifications/notifications.service.js"
-import { adapterFor } from "./adapters/index.js"
-import type { AdapterContext, Credentials, GatewayAdapter } from "./adapters/types.js"
+import { adapterFor } from "./adapters.js"
+import type { AdapterContext, Credentials, GatewayAdapter } from "./kit.js"
 
 export function toConnectionDto(r: ConnectionRow): GatewayConnection {
   return {
@@ -43,10 +44,12 @@ export class ConnectionsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** Context the adapters use for outgoing calls. */
-  context(gatewayId: string): AdapterContext {
-    const baseUrl = gatewayId === "paystack" ? this.config.gateways.paystackUrl : this.config.gateways.flutterwaveUrl
-    return { fetch: this.fetch, baseUrl, timeoutMs: this.config.gateways.timeoutMs }
+  /** Context the adapters use for calls to one gateway account (its gateway and mode decide the API host). */
+  context(account: { gatewayId: string; mode: string }): AdapterContext {
+    const gateway = requireGateway(account.gatewayId)
+    const mode = account.mode as Mode
+    const baseUrl = this.config.gateways.apiUrls[gateway.id] ?? gatewayApiBaseUrl(gateway, mode)
+    return { fetch: this.fetch, baseUrl, mode, timeoutMs: this.config.gateways.timeoutMs }
   }
 
   adapter(gatewayId: string): GatewayAdapter {
@@ -200,7 +203,7 @@ export class ConnectionsService {
     const parsed = buildCredentialSchema(gateway, input.mode).safeParse(input.credentials)
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Credentials were rejected" }
     const adapter = this.adapter(gateway.id)
-    return adapter.testConnection(this.context(gateway.id), parsed.data as Credentials)
+    return adapter.testConnection(this.context({ gatewayId: gateway.id, mode: input.mode }), parsed.data as Credentials)
   }
 
   /** Records a gateway failure on the account and tells the people who manage gateways. */
