@@ -35,6 +35,9 @@ services:
   api:
     image: ${API_IMAGE:?set API_IMAGE}
     restart: unless-stopped
+    # Every other setting in .env (for example SESSION_DAYS or GATEWAY_TIMEOUT_MS) reaches the API too;
+    # the values under `environment` always win.
+    env_file: .env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://yaropay:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/yaropay

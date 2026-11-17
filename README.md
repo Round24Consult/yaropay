@@ -91,11 +91,21 @@ This runs Postgres, the API, the dashboard (http://localhost:3000) and Mailpit (
 
 #### Changing server settings from GitHub
 
-The server's settings live in `/opt/yaropay/.env`. You can change them without SSH: every GitHub Actions
-secret or variable named `ENV_<KEY>`, on the repository or on its `production` environment (which only
-`main` can deploy to), is written to that file as `<KEY>` on each deploy. `ENV_SMTP_URL` becomes
-`SMTP_URL`, `ENV_YAROPAY_CLOUD` becomes `YAROPAY_CLOUD`. Use a secret for anything sensitive and a
-variable for plain values; if both exist, the secret wins.
+The server's settings live in `/opt/yaropay/.env`, and every setting in it reaches the API (`deploy/compose.yml`
+passes the file to the API container; the few values fixed there, such as the database address, always
+win). You can change them without SSH: a GitHub Actions secret or variable named `ENV_<KEY>`, on the
+repository or on its `production` environment (which only `main` can deploy to), is written to that file
+as `<KEY>` on each deploy. `ENV_SMTP_URL` becomes `SMTP_URL`, `ENV_YAROPAY_CLOUD` becomes `YAROPAY_CLOUD`.
+Use a secret for anything sensitive and a variable for plain values; if both exist, the secret wins.
+
+These keys can be set this way: `APP_DOMAIN`, `SITE_DOMAIN`, `YAROPAY_CLOUD`, `YAROPAY_DISABLE_EE`,
+`SETUP_TOKEN`, `YAROPAY_ENCRYPTION_KEY_PREVIOUS`, `SMTP_URL`, `MAIL_FROM`, `BILLING_PAYSTACK_SECRET_KEY`,
+`LOG_LEVEL`, `SESSION_DAYS`, `PASSWORD_HASH_COST`, `RATE_LIMIT`, `V1_RATE_LIMIT_PER_MINUTE`, `CORS_ORIGINS`,
+`GATEWAY_TIMEOUT_MS`, `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOW_PRIVATE`, `WORKERS`, `WORKER_INTERVAL_MS`,
+`DB_MIGRATE_ON_START` and `BACKUP_KEEP_DAYS`. Each is named once in the "Apply server settings from
+GitHub" step of `.github/workflows/deploy.yml`; to support another key, add a line there. (The workflow
+names each key rather than reading every secret at once, because GitHub refuses to run a workflow that
+sends all its secrets to another machine.)
 
 To apply a change without a code change: edit the secret or variable on GitHub, then run **Actions →
 Deploy → Run workflow** with the commit left empty. The deploy:
