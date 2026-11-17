@@ -56,7 +56,12 @@ export interface GatewayDefinition<Id extends string = string> {
   name: string
   tagline: string
   description: string
-  status: "available" | "coming_soon"
+  /**
+   * `available`: built and confirmed with real sandbox payments. `beta`: fully usable, built from the
+   * gateway's documentation but not yet confirmed with a real sandbox payment; the dashboard marks it.
+   * `coming_soon`: listed as planned, can't be installed.
+   */
+  status: "available" | "beta" | "coming_soon"
   /** Brand-neutral monogram tile colours (we never ship third-party logos). */
   monogram: string
   website: string
@@ -78,6 +83,14 @@ export interface GatewayDefinition<Id extends string = string> {
    * such flow.
    */
   directModeExample?: string
+}
+
+/** Shown next to a beta gateway in the dashboard. */
+export const BETA_GATEWAY_NOTE = "Built from the gateway's documentation; not yet confirmed with a real sandbox payment."
+
+/** Whether companies can install the gateway: available or beta, not coming soon. */
+export function isInstallable(def: Pick<GatewayDefinition, "status">): boolean {
+  return def.status !== "coming_soon"
 }
 
 /** The API base URL for an account in the given mode. */

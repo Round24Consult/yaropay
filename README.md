@@ -2,14 +2,30 @@
 
 Open-source, self-hosted payment orchestration for companies that run several products on one payment gateway account.
 
-A company installs YaroPay once, adds its Paystack or Flutterwave keys, and connects every website, SaaS app and mobile app to it. Each product gets its own API keys, signing secret, callback URLs and webhook endpoint. YaroPay ties every payment to the product that started it, so sales, payments and webhooks stay separate per product even though they all go through the same gateway account.
+A company installs YaroPay once, adds its payment gateway keys ([see the gateways](#gateways)), and connects every website, SaaS app and mobile app to it. Each product gets its own API keys, signing secret, callback URLs and webhook endpoint. YaroPay ties every payment to the product that started it, so sales, payments and webhooks stay separate per product even though they all go through the same gateway account.
 
-- **Multi-product routing.** Paystack and Flutterwave send every event for an account to one URL. YaroPay matches each event to its product (by known reference, `metadata.yaropay_product`, then reference prefix) and forwards it to that product only. Events that match nothing are held as *unrouted*.
-- **Real gateway integrations.** Paystack and Flutterwave v3: initialise, verify, callbacks, webhook signature checks (`x-paystack-signature` HMAC-SHA512, Flutterwave `verif-hash`), test connection.
+- **Multi-product routing.** A gateway sends every event for an account to one URL. YaroPay matches each event to its product (by known reference, `metadata.yaropay_product`, then reference prefix) and forwards it to that product only. Events that match nothing are held as *unrouted*.
+- **Real gateway integrations.** Each gateway adapter starts payments, verifies them with the gateway, reads callbacks, checks webhook signatures and tests keys. See [Gateways](#gateways).
 - **Signed deliveries with retries.** Every event YaroPay forwards is signed (`x-yaropay-signature: t=…,v1=…`), retried 8 times over about 45 hours, and can be replayed from the dashboard.
 - **Auth, roles and product scope.** Email and password sign-in, invites, password reset, sessions you can revoke. Five roles (owner, admin, developer, finance, viewer), and members can be limited to some products.
 - **Notifications.** In-app with a live bell (server-sent events), email, and an alerts webhook for Slack, Discord or Teams. Each member picks channels per event type.
 - **Dashboard.** Revenue by product, gateway split per product, transactions with a routing timeline, webhook deliveries, audit log. Light and dark, Test and Live modes.
+
+## Gateways
+
+| Gateway | Status | Currencies | Notes |
+|---|---|---|---|
+| Paystack | Available | NGN, GHS, KES, ZAR, USD | |
+| Flutterwave | Available | NGN, GHS, KES, ZAR, USD | |
+| Stripe | Coming soon | | |
+| PayPal | Coming soon | | |
+| Monnify | Coming soon | | |
+| Korapay | Coming soon | | |
+
+**Available** gateways have been confirmed with real sandbox payments. **Beta** gateways are fully usable but
+were built from the gateway's documentation and haven't yet been confirmed with a real sandbox payment;
+the dashboard marks them, and reports from your first test payments are very welcome. Every gateway is free
+in every edition.
 
 ## How a payment flows
 
@@ -244,7 +260,7 @@ fixtures folder, and registers them. [docs/adding-a-gateway.md](docs/adding-a-ga
 
 ## Not yet
 
-Refunds from the dashboard, custom roles, several companies per install, Flutterwave v4 (OAuth), Stripe, PayPal, Monnify and Korapay adapters (next), an OpenAPI document.
+Refunds from the dashboard, custom roles, several companies per install, Flutterwave v4 (OAuth), more gateways (see [Gateways](#gateways)), an OpenAPI document.
 
 ## Editions and the paid build
 

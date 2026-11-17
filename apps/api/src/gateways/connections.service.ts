@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common"
 import type { ConnectionDetail, ConnectionTestResult, GatewayListItem } from "@yaropay/core/api"
 import { buildCredentialSchema, type ConnectionInput, maskCredentials } from "@yaropay/core/gateways/credentials"
 import { gatewayRegistry, getGateway, requireGateway } from "@yaropay/core/gateways/registry"
-import { gatewayApiBaseUrl } from "@yaropay/core/gateways/types"
+import { gatewayApiBaseUrl, isInstallable } from "@yaropay/core/gateways/types"
 import type { ColorSlot, GatewayConnection, GatewayId, Mode } from "@yaropay/core/types"
 import { and, asc, eq, sql } from "drizzle-orm"
 import { AuditService } from "../audit/audit.service.js"
@@ -105,7 +105,7 @@ export class ConnectionsService {
   private validateCredentials(gatewayId: string, mode: Mode, credentials: Record<string, string>) {
     const gateway = getGateway(gatewayId)
     if (!gateway) throw notFound("Gateway")
-    if (gateway.status !== "available") throw conflict(`${gateway.name} is not available yet`)
+    if (!isInstallable(gateway)) throw conflict(`${gateway.name} is not available yet`)
     const parsed = buildCredentialSchema(gateway, mode).safeParse(credentials)
     if (!parsed.success) throw invalid(zodFields(parsed.error, "credentials."), "Some credentials need attention")
     const clean: Credentials = {}

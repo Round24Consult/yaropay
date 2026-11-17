@@ -32,7 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { TransactionRow } from "@yaropay/core/api"
-import { gatewayRegistry } from "@yaropay/core/gateways/registry"
+import { installableGateways } from "@yaropay/core/gateways/registry"
 import { CURRENCIES, formatMoney } from "@yaropay/core/money"
 import type { ColorSlot } from "@yaropay/core/types"
 import { API_BASE, toQuery } from "@/lib/api/client"
@@ -260,9 +260,7 @@ export function TransactionsView() {
     label: p.name,
     icon: <ProductDot slot={p.colorSlot as ColorSlot} />,
   }))
-  const gatewayOptions: FacetOption[] = gatewayRegistry
-    .filter((g) => g.status === "available")
-    .map((g) => ({ value: g.id, label: g.name, icon: <GatewayMark gatewayId={g.id} size="sm" className="size-4 text-[7px]" /> }))
+  const gatewayOptions: FacetOption[] = installableGateways.map((g) => ({ value: g.id, label: g.name, icon: <GatewayMark gatewayId={g.id} size="sm" className="size-4 text-[7px]" /> }))
   const statusOptions: FacetOption[] = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const channelOptions: FacetOption[] = Object.entries(CHANNEL_LABELS).map(([value, label]) => ({ value, label }))
 

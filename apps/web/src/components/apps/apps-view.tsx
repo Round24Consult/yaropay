@@ -5,13 +5,14 @@ import * as React from "react"
 import { PageHeader, Panel } from "@/components/shared/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useGateways } from "@/lib/api/hooks"
+import { isInstallable } from "@yaropay/core/gateways/types"
 import { GatewayCard } from "./gateway-card"
 import { InstallDialog } from "./install-dialog"
 
 export function AppsView() {
   const { data, isLoading } = useGateways()
   const [installing, setInstalling] = React.useState<string | null>(null)
-  const available = data?.filter((i) => i.gateway.status === "available") ?? []
+  const available = data?.filter((i) => isInstallable(i.gateway)) ?? []
   const soon = data?.filter((i) => i.gateway.status === "coming_soon") ?? []
   const installedCount = available.filter((i) => i.connections.length).length
 
@@ -44,14 +45,16 @@ export function AppsView() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Coming soon</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {soon.map((item) => (
-            <GatewayCard key={item.gateway.id} item={item} onInstall={setInstalling} />
-          ))}
-        </div>
-      </section>
+      {soon.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Coming soon</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {soon.map((item) => (
+              <GatewayCard key={item.gateway.id} item={item} onInstall={setInstalling} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <InstallDialog gatewayId={installing} open={!!installing} onOpenChange={(o) => !o && setInstalling(null)} />
     </div>

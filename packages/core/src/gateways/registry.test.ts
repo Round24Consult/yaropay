@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { isCurrencyCode } from "../currencies.ts"
-import { AVAILABLE_GATEWAY_IDS, DEFAULT_GATEWAY_ID, GATEWAY_IDS, GATEWAYS, getGateway, isGatewayId, SUPPORTED_CURRENCIES } from "./registry.ts"
-import { gatewayApiBaseUrl } from "./types.ts"
+import { AVAILABLE_GATEWAY_IDS, DEFAULT_GATEWAY_ID, GATEWAY_IDS, GATEWAYS, getGateway, installableGateways, isGatewayId, SUPPORTED_CURRENCIES } from "./registry.ts"
+import { gatewayApiBaseUrl, isInstallable } from "./types.ts"
 
 describe("gateway registry", () => {
   it("keys every definition by its own id, in the id format the API and env vars use", () => {
@@ -20,6 +20,16 @@ describe("gateway registry", () => {
     expect(SUPPORTED_CURRENCIES.slice(0, 2)).toEqual(["NGN", "USD"])
     expect(SUPPORTED_CURRENCIES).toEqual(expect.arrayContaining(["GHS", "KES", "ZAR"]))
     expect(AVAILABLE_GATEWAY_IDS).toContain(DEFAULT_GATEWAY_ID)
+  })
+
+  it("lets companies install available and beta gateways, never coming-soon ones", () => {
+    expect(isInstallable({ status: "available" })).toBe(true)
+    expect(isInstallable({ status: "beta" })).toBe(true)
+    expect(isInstallable({ status: "coming_soon" })).toBe(false)
+    expect(installableGateways.map((g) => g.id)).toEqual(AVAILABLE_GATEWAY_IDS)
+    for (const g of Object.values(GATEWAYS)) expect(AVAILABLE_GATEWAY_IDS.includes(g.id), g.id).toBe(g.status !== "coming_soon")
+    // Examples and previews use a confirmed gateway rather than a beta one.
+    expect(getGateway(DEFAULT_GATEWAY_ID)?.status).toBe("available")
   })
 
   it("looks gateways up without trusting prototype keys", () => {

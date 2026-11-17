@@ -71,8 +71,9 @@ if (existsSync(apiDir)) fail(`apps/api/src/gateways/${id} already exists.`)
 
 const monogram = name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || id.slice(0, 2).toUpperCase()
 
-const definition = `// ${MARK}. Fill in every TODO from ${name}'s official documentation, then set status to
-// "available" once apps/api/src/gateways/${id}/adapter.test.ts passes without \`pending\`.
+const definition = `// ${MARK}. Fill in every TODO from ${name}'s official documentation. Set status to "beta" once
+// apps/api/src/gateways/${id}/adapter.test.ts passes without \`pending\`, and to "available" once a real
+// sandbox payment has gone through end to end.
 import type { GatewayDefinition } from "../types.ts"
 
 export const ${camel}: GatewayDefinition<"${id}"> = {
@@ -220,4 +221,4 @@ else console.log(`  packages/core/src/gateways/${id}/definition.ts   (kept the e
 console.log(`  apps/api/src/gateways/${id}/adapter.ts          the server adapter`)
 console.log(`  apps/api/src/gateways/${id}/adapter.test.ts     the shared contract tests (pending)`)
 console.log(`  apps/api/src/gateways/${id}/fixtures/           recorded sandbox responses`)
-console.log("Next: fill in the TODOs, record fixtures, remove `pending: true`, then set the definition's status to \"available\".")
+console.log("Next: fill in the TODOs, record fixtures and remove `pending: true`. Then set the definition's status to \"beta\", and to \"available\" once a real sandbox payment has worked.")

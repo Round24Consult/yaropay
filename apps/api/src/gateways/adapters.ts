@@ -6,7 +6,7 @@ import { paystackAdapter } from "./paystack/adapter.js"
 // gateway:imports
 
 /**
- * Server adapters by gateway id. Every gateway marked "available" in the registry
+ * Server adapters by gateway id. Every gateway marked "available" or "beta" in the registry
  * (packages/core/src/gateways/registry.ts) needs one; adapters.test.ts checks that.
  */
 export const ADAPTERS: Partial<Record<GatewayId, GatewayAdapter>> = {
