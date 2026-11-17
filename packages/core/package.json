@@ -1,6 +1,6 @@
 {
   "name": "@yaropay/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Framework-free domain code shared by the YaroPay API and dashboard",
   "license": "AGPL-3.0-only",
@@ -11,7 +11,9 @@
       "default": "./dist/*.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
