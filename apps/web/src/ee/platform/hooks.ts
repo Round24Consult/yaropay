@@ -11,6 +11,9 @@ import type {
   OperatorCheckResult,
   OperatorSettingKey,
   PlatformAuditEntry,
+  PlatformGatewayRow,
+  PlatformInvoiceFilter,
+  PlatformInvoicePage,
   PlatformOperatorSettings,
   PlatformOverview,
   PlatformRates,
@@ -33,6 +36,8 @@ export const pk = {
   settings: ["platform", "settings"] as const,
   operatorSettings: ["platform", "operator-settings"] as const,
   users: (params: object) => ["platform", "users", params] as const,
+  invoices: (params: object) => ["platform", "invoices", params] as const,
+  gateways: ["platform", "gateways"] as const,
 }
 
 /** 404 and the two-step 403 are answers, not glitches: don't retry them. */
@@ -263,5 +268,33 @@ export function useUserAction() {
   return useMutation({
     mutationFn: (input: { userId: string; action: UserAction }) => api<{ ok: true }>(`/platform/users/${input.userId}/${input.action}`, { method: "POST" }),
     onSuccess: refresh,
+  })
+}
+
+/** Platform → Invoices: one page of every company's invoices. */
+export function usePlatformInvoices(params: { status: PlatformInvoiceFilter; page: number }) {
+  return useQuery({
+    queryKey: pk.invoices(params),
+    queryFn: () => api<PlatformInvoicePage>("/platform/invoices", { params: { ...params, pageSize: 25 } }),
+    placeholderData: keepPreviousData,
+    retry,
+  })
+}
+
+/** Platform → Gateways. */
+export function usePlatformGateways() {
+  return useQuery({ queryKey: pk.gateways, queryFn: () => api<PlatformGatewayRow[]>("/platform/gateways"), retry })
+}
+
+export function useSetGatewayOffered() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; offered: boolean }) => api<PlatformGatewayRow[]>(`/platform/gateways/${input.id}`, { method: "PUT", json: { offered: input.offered } }),
+    onSuccess: (rows) => {
+      qc.setQueryData(pk.gateways, rows)
+      // The super admin's own company's Apps page reads the same "offered" flags.
+      void qc.invalidateQueries({ queryKey: ["gateways"] })
+      void qc.invalidateQueries({ queryKey: pk.audit })
+    },
   })
 }

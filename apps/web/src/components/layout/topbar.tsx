@@ -22,6 +22,7 @@ import { useMe } from "@/lib/auth"
 import { useMode } from "@/lib/mode"
 import { CommandMenu } from "./command-menu"
 import { NotificationBell } from "./notification-bell"
+import { isConsolePath } from "./sidebar-switch"
 import { UserAvatar, UserMenuItems } from "./user-menu"
 
 const LABELS: Record<string, string> = {
@@ -32,7 +33,12 @@ const LABELS: Record<string, string> = {
   settings: "Settings",
   new: "New product",
   platform: "Platform",
+  companies: "Companies",
   pricing: "Plans & pricing",
+  invoices: "Invoices",
+  billing: "Billing",
+  gateways: "Gateways",
+  email: "Email",
   audit: "Audit log",
   people: "People",
 }
@@ -52,7 +58,7 @@ function useCrumbs() {
       label = c ? c.label : "Account"
     }
     // The platform console has no /platform/workspaces page: that crumb goes back to the list.
-    if (parts[0] === "platform" && part === "workspaces") return { href: "/platform", label: "Companies" }
+    if (parts[0] === "platform" && part === "workspaces") return { href: "/platform/companies", label: "Companies" }
     if (parts[0] === "platform" && parts[1] === "workspaces" && i === 2) label = "Company"
     return { href, label }
   })
@@ -63,10 +69,12 @@ export function Topbar() {
   const crumbs = useCrumbs()
   const { mode, setMode } = useMode()
   const [open, setOpen] = React.useState(false)
+  // Test mode only filters a company's own data; the platform console doesn't use it.
+  const inConsole = isConsolePath(usePathname())
 
   return (
     <>
-      {mode === "test" && (
+      {mode === "test" && !inConsole && (
         <div className="flex items-center justify-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-1.5 text-xs font-medium text-warning-text">
           <FlaskConical className="size-3.5" aria-hidden />
           Test mode: you are looking at sandbox payments only.

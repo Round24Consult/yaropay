@@ -9,7 +9,7 @@ import { AuditService } from "../audit/audit.service.js"
 import type { AuditContext } from "../auth/types.js"
 import { newId } from "../common/crypto.js"
 import { EncryptionService } from "../common/encryption.service.js"
-import { conflict, invalid, notFound, zodFields } from "../common/errors.js"
+import { ApiException, conflict, invalid, notFound, zodFields } from "../common/errors.js"
 import { FETCH, type FetchFn } from "../common/http.js"
 import { APP_CONFIG, type AppConfig } from "../config/config.js"
 import { DB } from "../database/database.module.js"
@@ -17,6 +17,7 @@ import type { Db, DbOrTx } from "../database/db.js"
 import { type ConnectionRow, connections, productGateways, products } from "../database/schema.js"
 import { NotificationsService } from "../notifications/notifications.service.js"
 import { OperatorSettingsService } from "../settings/operator-settings.service.js"
+import { SettingsService } from "../settings/settings.service.js"
 import { adapterFor } from "./adapters.js"
 import type { AdapterContext, Credentials, GatewayAdapter } from "./kit.js"
 
@@ -44,6 +45,7 @@ export class ConnectionsService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly operator: OperatorSettingsService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Context the adapters use for calls to one gateway account (its gateway and mode decide the API host). */
@@ -84,8 +86,22 @@ export class ConnectionsService {
   }
 
   async gateways(workspaceId: string): Promise<GatewayListItem[]> {
-    const all = await this.list(workspaceId)
-    return gatewayRegistry.map((gateway) => ({ gateway, connections: all.filter((c) => c.gatewayId === gateway.id) }))
+    const [all, disabled] = await Promise.all([this.list(workspaceId), this.settings.disabledGateways()])
+    return gatewayRegistry.map((gateway) => ({
+      gateway,
+      offered: !disabled.includes(gateway.id),
+      connections: all.filter((c) => c.gatewayId === gateway.id),
+    }))
+  }
+
+  /**
+   * New accounts only go on gateways the install offers. Turning a gateway off never touches accounts
+   * already connected: they keep taking payments, and their keys can still be updated.
+   */
+  private async assertOffered(gatewayId: string) {
+    if (!(await this.settings.disabledGateways()).includes(gatewayId)) return
+    const name = getGateway(gatewayId)?.name ?? gatewayId
+    throw new ApiException(422, `${name} isn't offered on this YaroPay install. Accounts already connected keep working.`, { code: "gateway_turned_off" })
   }
 
   async detail(workspaceId: string, id: string): Promise<ConnectionDetail> {
@@ -120,6 +136,7 @@ export class ConnectionsService {
 
   async install(input: ConnectionInput, ctx: AuditContext): Promise<GatewayConnection> {
     const { gateway, clean } = this.validateCredentials(input.gatewayId, input.mode, input.credentials)
+    await this.assertOffered(gateway.id)
     const [dupe] = await this.db
       .select({ id: connections.id })
       .from(connections)
@@ -202,6 +219,7 @@ export class ConnectionsService {
   async test(input: { gatewayId: string; mode: Mode; credentials: Record<string, string> }): Promise<ConnectionTestResult> {
     const gateway = getGateway(input.gatewayId)
     if (!gateway) throw notFound("Gateway")
+    await this.assertOffered(gateway.id)
     const parsed = buildCredentialSchema(gateway, input.mode).safeParse(input.credentials)
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Credentials were rejected" }
     const adapter = this.adapter(gateway.id)

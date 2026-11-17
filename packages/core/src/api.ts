@@ -77,6 +77,8 @@ export interface ConnectionTestResult {
 
 export interface GatewayListItem {
   gateway: GatewayDefinition
+  /** False when the install's operator has turned the gateway off: no new accounts, existing ones keep working. */
+  offered: boolean
   connections: GatewayConnection[]
 }
 

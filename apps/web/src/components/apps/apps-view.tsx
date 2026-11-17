@@ -12,8 +12,11 @@ import { InstallDialog } from "./install-dialog"
 export function AppsView() {
   const { data, isLoading } = useGateways()
   const [installing, setInstalling] = React.useState<string | null>(null)
-  const available = data?.filter((i) => isInstallable(i.gateway)) ?? []
-  const soon = data?.filter((i) => i.gateway.status === "coming_soon") ?? []
+  // A gateway the install's operator turned off is hidden unless this company already has an account
+  // on it: those accounts keep working and stay manageable here, but no new ones can be added.
+  const visible = data?.filter((i) => i.offered || i.connections.length > 0) ?? []
+  const available = visible.filter((i) => isInstallable(i.gateway))
+  const soon = visible.filter((i) => i.gateway.status === "coming_soon")
   const installedCount = available.filter((i) => i.connections.length).length
 
   return (

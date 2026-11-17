@@ -405,3 +405,29 @@ export interface CreatedWorkspace {
 }
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>
+
+/** Platform → Gateways: one row per gateway YaroPay supports, and whether this install offers it. */
+export interface PlatformGatewayRow {
+  id: string
+  name: string
+  status: "available" | "beta" | "coming_soon"
+  /** False once the operator turns it off: companies can't add new accounts; existing ones keep working. */
+  offered: boolean
+  /** Companies with at least one account on the gateway, by mode (sample data left out). */
+  companies: { live: number; test: number }
+  accounts: { live: number; test: number }
+}
+
+export const setGatewayOfferedSchema = z.object({ offered: z.boolean() })
+
+/** Platform → Invoices: one page of every company's invoices. `overdue` is open and past its due date. */
+export const PLATFORM_INVOICE_FILTERS = ["all", "open", "overdue", "paid", "void"] as const
+export type PlatformInvoiceFilter = (typeof PLATFORM_INVOICE_FILTERS)[number]
+
+export interface PlatformInvoicePage {
+  invoices: (Invoice & { workspaceId: string; workspaceName: string })[]
+  total: number
+  page: number
+  pageSize: number
+  counts: Record<PlatformInvoiceFilter, number>
+}

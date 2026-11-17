@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common"
 import type { CurrencyCode, PlatformSettings } from "@yaropay/core/types"
 import { normalizeBaseUrl } from "@yaropay/core/urls"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { EncryptionService } from "../common/encryption.service.js"
 import { APP_CONFIG, type AppConfig } from "../config/config.js"
 import { DB } from "../database/database.module.js"
@@ -42,6 +42,27 @@ export class SettingsService {
   async install(tx?: DbOrTx): Promise<{ platformName: string; baseUrl: string; signupsOpen: boolean; signupPlan: string }> {
     const row = await this.row(tx)
     return { platformName: row.platformName, baseUrl: row.baseUrl, signupsOpen: row.signupsOpen, signupPlan: row.signupPlan }
+  }
+
+  /** Gateways turned off on this install: no new accounts on them (existing accounts keep working). */
+  async disabledGateways(tx?: DbOrTx): Promise<string[]> {
+    return (await this.row(tx)).disabledGateways
+  }
+
+  /** Offers a gateway to companies again, or stops offering it. Returns the new list of turned-off gateways. */
+  async setGatewayOffered(gatewayId: string, offered: boolean, tx: DbOrTx = this.db): Promise<string[]> {
+    await this.row(tx)
+    const [row] = await tx
+      .update(settings)
+      .set({
+        disabledGateways: offered
+          ? sql`array_remove(${settings.disabledGateways}, ${gatewayId})`
+          : sql`case when ${gatewayId} = any(${settings.disabledGateways}) then ${settings.disabledGateways} else array_append(${settings.disabledGateways}, ${gatewayId}) end`,
+        updatedAt: new Date(),
+      })
+      .where(eq(settings.id, 1))
+      .returning({ disabledGateways: settings.disabledGateways })
+    return row.disabledGateways
   }
 
   /** Install values merged with the workspace's own (company name, currency, alerts). */

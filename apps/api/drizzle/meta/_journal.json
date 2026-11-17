@@ -113,6 +113,13 @@
       "when": 1794928729551,
       "tag": "0015_operator_runtime_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794932018890,
+      "tag": "0016_gateway_availability",
+      "breakpoints": true
     }
   ]
 }

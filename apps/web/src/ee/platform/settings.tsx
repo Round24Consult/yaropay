@@ -2,7 +2,7 @@
 
 // YaroPay Enterprise License: see LICENSE.md in the parent folder.
 
-import { OPERATOR_SETTING_GROUPS, type OperatorSetting } from "@yaropay/core/platform"
+import { OPERATOR_SETTING_GROUPS, type OperatorSetting, type OperatorSettingGroup } from "@yaropay/core/platform"
 import { Loader2 } from "lucide-react"
 import * as React from "react"
 import { toast } from "sonner"
@@ -17,23 +17,42 @@ import { ApiRequestError } from "@/lib/api/client"
 import { useClearOperatorSetting, useOperatorCheck, useOperatorSettings, useSetOperatorSetting } from "./hooks"
 import { isCancelled, PlatformShell, useGuarded } from "./platform-shell"
 
-export function PlatformSettingsPage() {
+const HOW_IT_WORKS =
+  "A value saved here wins over the server's .env; Clear goes back to it. Changes need your password and code, apply at once and are recorded in the audit log."
+
+/** Platform → Billing: the key YaroPay charges companies' cards with. */
+export function PlatformBillingPage() {
   return (
-    <PlatformShell
-      title="Platform settings"
-      description="Change these here instead of in the server's .env file. A value saved here wins over the server's own; Clear goes back to it. Changes need your password and code, apply at once and are recorded in the audit log."
-    >
-      <OperatorSettings />
+    <PlatformShell title="Billing" description={`The Paystack account YaroPay Cloud charges companies' cards through. ${HOW_IT_WORKS}`}>
+      <OperatorSettings groups={["billing"]} />
     </PlatformShell>
   )
 }
 
-function OperatorSettings() {
+/** Platform → Email: the server and sender for invites, password resets and notifications. */
+export function PlatformEmailPage() {
+  return (
+    <PlatformShell title="Email" description={`How YaroPay sends invites, password resets, invoices and notifications. ${HOW_IT_WORKS}`}>
+      <OperatorSettings groups={["email"]} />
+    </PlatformShell>
+  )
+}
+
+/** Platform → Settings: limits, timeouts, sessions, logging and workers. */
+export function PlatformSettingsPage() {
+  return (
+    <PlatformShell title="Settings" description={`Server settings you can change without editing the server's .env. ${HOW_IT_WORKS}`}>
+      <OperatorSettings groups={["limits", "sessions", "logging"]} footnote />
+    </PlatformShell>
+  )
+}
+
+function OperatorSettings({ groups, footnote = false }: { groups: OperatorSettingGroup[]; footnote?: boolean }) {
   const { data } = useOperatorSettings()
   if (!data) {
     return (
       <div className="grid gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: groups.length * 2 }).map((_, i) => (
           <Skeleton key={i} className="h-40 rounded-2xl" />
         ))}
       </div>
@@ -41,7 +60,7 @@ function OperatorSettings() {
   }
   return (
     <div className="grid gap-8">
-      {OPERATOR_SETTING_GROUPS.map((group) => {
+      {OPERATOR_SETTING_GROUPS.filter((g) => groups.includes(g.id)).map((group) => {
         const settings = data.settings.filter((s) => s.group === group.id)
         if (settings.length === 0) return null
         return (
@@ -55,10 +74,12 @@ function OperatorSettings() {
           </section>
         )
       })}
-      <p className="text-sm text-muted-foreground">
-        The encryption key, the database, the setup token, the edition and anything the server only reads when it starts stay in the server&apos;s .env: they
-        can&apos;t be changed from the web.
-      </p>
+      {footnote && (
+        <p className="text-sm text-muted-foreground">
+          The encryption key, the database, the setup token, the edition and anything the server only reads when it starts stay in the server&apos;s .env: they
+          can&apos;t be changed from the web. Most of them can be changed from GitHub instead (see &quot;Changing server settings from GitHub&quot; in the README).
+        </p>
+      )}
     </div>
   )
 }
