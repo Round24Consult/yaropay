@@ -1,0 +1,33 @@
+{
+  "id": "evt_1FixtureExpired0001",
+  "object": "event",
+  "created": 1794995401,
+  "livemode": false,
+  "type": "checkout.session.expired",
+  "data": {
+    "object": {
+      "object": "checkout.session",
+      "mode": "payment",
+      "livemode": false,
+      "currency": "usd",
+      "amount_subtotal": 150000,
+      "amount_total": 150000,
+      "client_reference_id": "SHW_FIXTURE003",
+      "customer_email": "kemi@example.com",
+      "metadata": {
+        "yaropay_product": "prd_fixture1",
+        "yaropay_reference": "SHW_FIXTURE003"
+      },
+      "success_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?reference=SHW_FIXTURE001&session_id={CHECKOUT_SESSION_ID}",
+      "cancel_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?outcome=cancelled&ct=0123456789abcdef&reference=SHW_FIXTURE001",
+      "created": 1794909000,
+      "expires_at": 1794995400,
+      "ui_mode": "hosted_page",
+      "id": "cs_test_a1FixtureSessionExp01",
+      "status": "expired",
+      "payment_status": "unpaid",
+      "customer_details": null,
+      "payment_intent": null
+    }
+  }
+}

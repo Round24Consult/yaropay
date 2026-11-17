@@ -1,0 +1,57 @@
+{
+  "object": "checkout.session",
+  "mode": "payment",
+  "livemode": false,
+  "currency": "usd",
+  "amount_subtotal": 150000,
+  "amount_total": 150000,
+  "client_reference_id": "SHW_FIXTURE001",
+  "customer_email": "kemi@example.com",
+  "metadata": {
+    "yaropay_product": "prd_fixture1",
+    "orderId": "1042",
+    "yaropay_reference": "SHW_FIXTURE001"
+  },
+  "success_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?reference=SHW_FIXTURE001&session_id={CHECKOUT_SESSION_ID}",
+  "cancel_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?outcome=cancelled&ct=0123456789abcdef&reference=SHW_FIXTURE001",
+  "created": 1794909000,
+  "expires_at": 1794995400,
+  "ui_mode": "hosted_page",
+  "id": "cs_test_a1FixtureSessionOk01",
+  "status": "complete",
+  "payment_status": "paid",
+  "customer_details": {
+    "email": "kemi@example.com",
+    "name": "Kemi Adeyemi"
+  },
+  "payment_intent": {
+    "id": "pi_3FixturePaid0001",
+    "object": "payment_intent",
+    "status": "succeeded",
+    "amount": 150000,
+    "currency": "usd",
+    "last_payment_error": null,
+    "latest_charge": {
+      "id": "ch_3FixturePaid0001",
+      "object": "charge",
+      "created": 1794909164,
+      "paid": true,
+      "status": "succeeded",
+      "payment_method_details": {
+        "type": "card",
+        "card": {
+          "brand": "visa",
+          "last4": "4242"
+        }
+      },
+      "balance_transaction": {
+        "id": "txn_3FixturePaid0001",
+        "object": "balance_transaction",
+        "amount": 150000,
+        "currency": "usd",
+        "fee": 4380,
+        "net": 145620
+      }
+    }
+  }
+}

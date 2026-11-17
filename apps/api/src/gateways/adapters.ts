@@ -3,6 +3,7 @@ import type { GatewayAdapter } from "./kit.js"
 // One folder per gateway. `npm run gateway:new` adds the import and the entry at the markers below.
 import { flutterwaveAdapter } from "./flutterwave/adapter.js"
 import { paystackAdapter } from "./paystack/adapter.js"
+import { stripeAdapter } from "./stripe/adapter.js"
 // gateway:imports
 
 /**
@@ -12,6 +13,7 @@ import { paystackAdapter } from "./paystack/adapter.js"
 export const ADAPTERS: Partial<Record<GatewayId, GatewayAdapter>> = {
   paystack: paystackAdapter,
   flutterwave: flutterwaveAdapter,
+  stripe: stripeAdapter,
   // gateway:entries
 }
 
