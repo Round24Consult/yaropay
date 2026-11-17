@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from "@nestjs/common"
 import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm"
 import { newId } from "../common/crypto.js"
+import { startLoop } from "../common/loop.js"
 import { APP_CONFIG, type AppConfig } from "../config/config.js"
 import { DB } from "../database/database.module.js"
 import type { Db, DbOrTx } from "../database/db.js"
 import { type JobRow, jobs } from "../database/schema.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 type Handler = (payload: Record<string, unknown>) => Promise<void>
 
@@ -18,12 +20,13 @@ const BACKOFF_MS = [30_000, 120_000, 600_000, 1_800_000, 3_600_000]
 export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger("Jobs")
   private readonly handlers = new Map<string, Handler>()
-  private timer: NodeJS.Timeout | null = null
+  private loop: { stop: () => void } | null = null
   private running = false
 
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   register(kind: string, handler: Handler) {
@@ -42,12 +45,11 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
 
   onApplicationBootstrap() {
     if (!this.config.workers) return
-    this.timer = setInterval(() => void this.tick(), this.config.workerIntervalMs)
-    this.timer.unref()
+    this.loop = startLoop(() => this.operator.workerIntervalMs(), () => this.tick())
   }
 
   onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer)
+    this.loop?.stop()
   }
 
   private async tick() {

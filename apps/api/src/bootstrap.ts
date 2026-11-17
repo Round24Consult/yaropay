@@ -4,10 +4,9 @@ import type { NestExpressApplication } from "@nestjs/platform-express"
 import cookieParser from "cookie-parser"
 import helmet from "helmet"
 import { AppModule } from "./app.module.js"
+import { levelsUpTo } from "./common/log-level.js"
 import type { AppConfig } from "./config/config.js"
 import type { Extension } from "./extension/extension.js"
-
-const LEVELS = ["error", "warn", "log", "debug", "verbose"] as const
 
 /** Builds the HTTP app. Shared by main.ts and the tests. */
 export async function createApp(config: AppConfig, opts: { logger?: false; extension?: Extension } = {}): Promise<INestApplication> {
@@ -15,7 +14,7 @@ export async function createApp(config: AppConfig, opts: { logger?: false; exten
     rawBody: true,
     // Open notification streams (SSE) would otherwise hold shutdown, and restarts, forever.
     forceCloseConnections: true,
-    logger: opts.logger === false ? false : LEVELS.slice(0, LEVELS.indexOf(config.logLevel) + 1),
+    logger: opts.logger === false ? false : levelsUpTo(config.logLevel),
   })
   return configureApp(app, config)
 }

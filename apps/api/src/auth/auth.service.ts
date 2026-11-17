@@ -28,6 +28,7 @@ import { WorkspacesService } from "../workspaces/workspaces.service.js"
 import { dummyHash, hashPassword, verifyPassword } from "./password.js"
 import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, Assurance, SessionContext } from "./types.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 export const SESSION_COOKIE = "yaropay_session"
 const DAY = 86_400_000
@@ -94,6 +95,7 @@ export class AuthService {
     @Inject(PERMISSION_RESOLVER) private readonly permissionResolver: PermissionResolver,
     @Inject(EDITION) private readonly edition: Edition,
     private readonly trusted: TrustedBrowsersService,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   /** The member's permissions in their workspace: the role's, unless the paid build says otherwise. */
@@ -113,7 +115,7 @@ export class AuthService {
   }
 
   private hash(password: string) {
-    return hashPassword(password, this.config.passwordCost)
+    return hashPassword(password, this.operator.passwordCost())
   }
 
   async state(): Promise<AuthState> {
@@ -163,7 +165,7 @@ export class AuthService {
       .from(users)
       .where(sql`lower(${users.email}) = ${email.toLowerCase()}`)
     if (!user) {
-      await verifyPassword(password, await dummyHash(this.config.passwordCost))
+      await verifyPassword(password, await dummyHash(this.operator.passwordCost()))
       throw unauthenticated("Email or password is incorrect")
     }
     if (!(await verifyPassword(password, user.passwordHash))) throw unauthenticated("Email or password is incorrect")
@@ -267,7 +269,7 @@ export class AuthService {
       ip: meta.ip,
       assurance: opts.pending ? "pending" : (opts.assurance ?? "password"),
       authenticatedAt: opts.authenticatedAt,
-      expiresAt: new Date(Date.now() + (opts.pending ? PENDING_SESSION_MS : this.config.sessionDays * DAY)),
+      expiresAt: new Date(Date.now() + (opts.pending ? PENDING_SESSION_MS : this.operator.sessionDays() * DAY)),
     })
     return { token, id }
   }
@@ -298,7 +300,7 @@ export class AuthService {
     if (!pending && now.getTime() - row.session.lastSeenAt.getTime() > TOUCH_EVERY_MS) {
       await this.db
         .update(sessions)
-        .set({ lastSeenAt: now, expiresAt: new Date(now.getTime() + this.config.sessionDays * DAY) })
+        .set({ lastSeenAt: now, expiresAt: new Date(now.getTime() + this.operator.sessionDays() * DAY) })
         .where(eq(sessions.id, row.session.id))
       await this.db.update(users).set({ lastActiveAt: now }).where(eq(users.id, row.user.id))
       await this.db
@@ -535,7 +537,7 @@ export class AuthService {
       .from(users)
       .where(sql`lower(${users.email}) = ${invite.email.toLowerCase()}`)
     if (!user) {
-      await verifyPassword(password, await dummyHash(this.config.passwordCost))
+      await verifyPassword(password, await dummyHash(this.operator.passwordCost()))
       throw new ApiException(409, "There's no account for this email yet. Create one instead.", { code: "no_account" })
     }
     if (!(await verifyPassword(password, user.passwordHash))) throw unauthenticatedField("password", "That password doesn't match this account")

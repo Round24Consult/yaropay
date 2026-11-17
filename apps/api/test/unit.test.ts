@@ -96,8 +96,10 @@ describe("guards and helpers", () => {
   })
 
   it("gives adapters the API host for the account's mode, unless the operator overrode it", () => {
-    const service = (env: Record<string, string>) => new ConnectionsService({} as never, fetch, loadConfig({ NODE_ENV: "test", ...env }), {} as never, {} as never, {} as never)
-    expect(service({}).context({ gatewayId: "monnify", mode: "test" })).toMatchObject({ baseUrl: "https://sandbox.monnify.com", mode: "test" })
+    // The gateway timeout comes from Platform → Settings when one is saved there, otherwise from the env.
+    const operator = { gatewayTimeoutMs: () => 2500 } as never
+    const service = (env: Record<string, string>) => new ConnectionsService({} as never, fetch, loadConfig({ NODE_ENV: "test", ...env }), {} as never, {} as never, {} as never, operator)
+    expect(service({}).context({ gatewayId: "monnify", mode: "test" })).toMatchObject({ baseUrl: "https://sandbox.monnify.com", mode: "test", timeoutMs: 2500 })
     expect(service({}).context({ gatewayId: "monnify", mode: "live" }).baseUrl).toBe("https://api.monnify.com")
     expect(service({}).context({ gatewayId: "paystack", mode: "live" }).baseUrl).toBe("https://api.paystack.co")
     expect(service({ MONNIFY_API_URL: "https://monnify.proxy.test" }).context({ gatewayId: "monnify", mode: "live" }).baseUrl).toBe("https://monnify.proxy.test")

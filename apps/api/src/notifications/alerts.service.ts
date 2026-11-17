@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common"
-import { APP_CONFIG, type AppConfig } from "../config/config.js"
 import { FETCH, type FetchFn } from "../common/http.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 /**
  * Posts operational alerts to an incoming-webhook URL. The body carries both
@@ -10,7 +10,7 @@ import { FETCH, type FetchFn } from "../common/http.js"
 export class AlertsService {
   constructor(
     @Inject(FETCH) private readonly fetch: FetchFn,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   async post(text: string, url: string): Promise<void> {
@@ -18,7 +18,7 @@ export class AlertsService {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text, content: text.replace(/<([^|>]+)\|([^>]+)>/g, "$2: $1") }),
-      signal: AbortSignal.timeout(this.config.webhookTimeoutMs),
+      signal: AbortSignal.timeout(this.operator.webhookTimeoutMs()),
     })
     if (!res.ok) throw new Error(`Alert webhook answered ${res.status}`)
   }

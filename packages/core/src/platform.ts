@@ -136,8 +136,37 @@ export const platformSettingsSchema = z
  * saved in the console wins over the env value; clearing it goes back to the env value. Everything
  * security-critical (encryption key, database, setup token, edition) stays env-only.
  */
-export const OPERATOR_SETTINGS = ["billingPaystackSecretKey", "smtpUrl", "mailFrom", "v1RateLimitPerMinute"] as const
+export const OPERATOR_SETTINGS = [
+  "billingPaystackSecretKey",
+  "smtpUrl",
+  "mailFrom",
+  "v1RateLimitPerMinute",
+  "gatewayTimeoutMs",
+  "webhookTimeoutMs",
+  "sessionDays",
+  "passwordHashCost",
+  "logLevel",
+  "workerIntervalMs",
+] as const
 export type OperatorSettingKey = (typeof OPERATOR_SETTINGS)[number]
+
+/** How Platform → Settings groups the cards, in this order. */
+export const OPERATOR_SETTING_GROUPS = [
+  { id: "billing", label: "Billing" },
+  { id: "email", label: "Email" },
+  { id: "limits", label: "Limits & timeouts" },
+  { id: "sessions", label: "Sessions & security" },
+  { id: "logging", label: "Logging & workers" },
+] as const
+export type OperatorSettingGroup = (typeof OPERATOR_SETTING_GROUPS)[number]["id"]
+
+/** The API's log levels, quietest first: each level includes the ones before it. */
+export const LOG_LEVELS = ["error", "warn", "log", "debug", "verbose"] as const
+export type LogLevel = (typeof LOG_LEVELS)[number]
+
+/** Password hashing cost. "fast" is for development and tests: production always uses "standard". */
+export const PASSWORD_HASH_COSTS = ["standard", "fast"] as const
+export type PasswordHashCost = (typeof PASSWORD_HASH_COSTS)[number]
 
 export interface OperatorSettingInfo {
   label: string
@@ -146,6 +175,13 @@ export interface OperatorSettingInfo {
   env: string
   /** Secrets are write-only: the API only ever returns their last 4 characters. */
   secret: boolean
+  group: OperatorSettingGroup
+  /** For numbers: the unit the value is in, shown next to it. */
+  unit?: string
+  /** For a choice: the values allowed, shown as a list. */
+  options?: readonly string[]
+  /** When a change takes effect, if that needs saying. */
+  note?: string
 }
 
 export const OPERATOR_SETTING_INFO: Record<OperatorSettingKey, OperatorSettingInfo> = {
@@ -154,24 +190,83 @@ export const OPERATOR_SETTING_INFO: Record<OperatorSettingKey, OperatorSettingIn
     description: "YaroPay's own Paystack account, used to charge companies' saved cards for their invoices. Without it, card payments are off.",
     env: "BILLING_PAYSTACK_SECRET_KEY",
     secret: true,
+    group: "billing",
   },
   smtpUrl: {
     label: "Email server (SMTP URL)",
     description: "Where YaroPay sends email: invites, password resets, invoices and alerts. Without it, emails are only written to the server log.",
     env: "SMTP_URL",
     secret: true,
+    group: "email",
   },
   mailFrom: {
     label: "Email sender",
     description: 'The From address on every email, for example "YaroPay <no-reply@yaropay.com>".',
     env: "MAIL_FROM",
     secret: false,
+    group: "email",
   },
   v1RateLimitPerMinute: {
     label: "Product API limit per company",
     description: "Product API requests one company can make each minute, across all its products and keys. Over it, requests get 429.",
     env: "V1_RATE_LIMIT_PER_MINUTE",
     secret: false,
+    group: "limits",
+    unit: "requests a minute",
+  },
+  gatewayTimeoutMs: {
+    label: "Gateway timeout",
+    description: "How long YaroPay waits for a payment gateway's API (and Cloud billing's calls to Paystack) before giving up.",
+    env: "GATEWAY_TIMEOUT_MS",
+    secret: false,
+    group: "limits",
+    unit: "ms",
+    note: "Applies from the next call to a gateway.",
+  },
+  webhookTimeoutMs: {
+    label: "Webhook timeout",
+    description: "How long YaroPay waits for a product's webhook endpoint, and for alert webhooks, before counting the attempt as failed.",
+    env: "WEBHOOK_TIMEOUT_MS",
+    secret: false,
+    group: "limits",
+    unit: "ms",
+    note: "Applies from the next delivery.",
+  },
+  sessionDays: {
+    label: "Sign-in length",
+    description: "How long a sign-in lasts without activity.",
+    env: "SESSION_DAYS",
+    secret: false,
+    group: "sessions",
+    unit: "days",
+    note: "Applies to new sign-ins, and to existing ones the next time they're renewed during use. Until then a sign-in keeps the expiry it has.",
+  },
+  passwordHashCost: {
+    label: "Password hashing cost",
+    description: "How much work goes into storing each password. Production always uses standard; fast is for development and tests only.",
+    env: "PASSWORD_HASH_COST",
+    secret: false,
+    group: "sessions",
+    options: PASSWORD_HASH_COSTS,
+    note: "Applies to passwords set from now on. Existing passwords keep working with the cost they were saved with.",
+  },
+  logLevel: {
+    label: "Log level",
+    description: "How much the API writes to its log. Each level includes the ones before it: error, warn, log, debug, verbose.",
+    env: "LOG_LEVEL",
+    secret: false,
+    group: "logging",
+    options: LOG_LEVELS,
+    note: "Applies at once.",
+  },
+  workerIntervalMs: {
+    label: "Worker interval",
+    description: "How often the background workers look for webhook deliveries and email jobs to run.",
+    env: "WORKER_INTERVAL_MS",
+    secret: false,
+    group: "logging",
+    unit: "ms",
+    note: "Applies from the workers' next round.",
   },
 }
 
@@ -206,6 +301,14 @@ const isSmtpUrl = (v: string) => {
   }
 }
 
+/** A whole number of milliseconds within the range the server's own env variable allows. */
+const milliseconds = (min: number, max: number) =>
+  z.coerce
+    .number()
+    .int("Use a whole number of milliseconds")
+    .min(min, `Use at least ${min.toLocaleString("en")} ms`)
+    .max(max, `Use at most ${max.toLocaleString("en")} ms`)
+
 /** How each setting's value is checked before it's saved. */
 export const operatorSettingValueSchemas = {
   billingPaystackSecretKey: z
@@ -223,6 +326,12 @@ export const operatorSettingValueSchemas = {
     .max(200)
     .regex(/^(?:[^<>@\n]*<\s*)?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+\s*>?$/, 'Enter an address like no-reply@example.com or "YaroPay <no-reply@example.com>"'),
   v1RateLimitPerMinute: z.coerce.number().int("Use a whole number").min(1, "Use at least 1").max(1_000_000, "Use at most 1,000,000"),
+  gatewayTimeoutMs: milliseconds(500, 60_000),
+  webhookTimeoutMs: milliseconds(500, 60_000),
+  sessionDays: z.coerce.number().int("Use a whole number of days").min(1, "Use at least 1 day").max(365, "Use at most 365 days"),
+  passwordHashCost: z.enum(PASSWORD_HASH_COSTS, "Choose standard or fast"),
+  logLevel: z.enum(LOG_LEVELS, "Choose error, warn, log, debug or verbose"),
+  workerIntervalMs: milliseconds(200, 60_000),
 } satisfies Record<OperatorSettingKey, z.ZodType>
 
 export const operatorSettingKeySchema = z.enum(OPERATOR_SETTINGS)

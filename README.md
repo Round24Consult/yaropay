@@ -237,16 +237,24 @@ API (`apps/api`, see `apps/api/.env.example`):
 | `WORKERS` | on | Delivery and outbox workers. Several API instances can share them. |
 | `RATE_LIMIT` | on | Per-IP limits on sign-in, reset and invite endpoints, and the per-company product API limit |
 | `V1_RATE_LIMIT_PER_MINUTE` | `1200` | Product API requests one company can make each minute. Cloud: can also be set in Platform → Settings. |
+| `GATEWAY_TIMEOUT_MS`, `WEBHOOK_TIMEOUT_MS` | `15000`, `10000` | How long YaroPay waits for a gateway's API, and for a product's (or alert) webhook endpoint. Cloud: can also be set in Platform → Settings. |
+| `SESSION_DAYS` | `30` | How long a sign-in lasts without activity. Cloud: can also be set in Platform → Settings. |
+| `PASSWORD_HASH_COST` | `standard` | `fast` for development and tests only; production always uses `standard`. |
+| `LOG_LEVEL` | `log` | `error`, `warn`, `log`, `debug` or `verbose`. Cloud: can also be set in Platform → Settings. |
+| `WORKER_INTERVAL_MS` | `2000` | How often the workers look for deliveries and jobs. Cloud: can also be set in Platform → Settings. |
 | `<ID>_API_URL` (`PAYSTACK_API_URL`, `FLUTTERWAVE_API_URL`, ...) | the gateway's own API | Send one gateway's API calls through a proxy or to another host |
 
 On YaroPay Cloud, the super admin can change the email server (`SMTP_URL`), the email sender (`MAIL_FROM`), the
-product API limit (`V1_RATE_LIMIT_PER_MINUTE`) and the billing Paystack key (`BILLING_PAYSTACK_SECRET_KEY`) in
-**Platform → Settings** instead of the server's `.env`. A value saved there wins over the env value and applies
+product API limit (`V1_RATE_LIMIT_PER_MINUTE`), the billing Paystack key (`BILLING_PAYSTACK_SECRET_KEY`), the
+gateway and webhook timeouts, the sign-in length (`SESSION_DAYS`, for new sign-ins and sessions as they're renewed),
+the password hashing cost (for passwords set from then on; production only accepts `standard`), the log level and
+the worker interval in **Platform → Settings** instead of the server's `.env`. A value saved there wins over the env value and applies
 at once on every API instance (within about 10 seconds); **Clear** goes back to the env value. Secrets are
 stored encrypted (and re-encrypted by the key rotation command), never shown again except their last 4
 characters, and every change needs the password and a two-step code and is recorded in the platform audit log.
-Security-critical values (`YAROPAY_ENCRYPTION_KEY`, `DATABASE_URL`, `SETUP_TOKEN`, `YAROPAY_CLOUD`) can only be
-set in the env.
+Security-critical values (`YAROPAY_ENCRYPTION_KEY`, `DATABASE_URL`, `SETUP_TOKEN`, `YAROPAY_CLOUD`), and settings
+the server only reads when it starts (`PORT`, `TRUST_PROXY`, `COOKIE_SECURE`, `WORKERS`, ...), can only be set in
+the env.
 
 Dashboard (`apps/web`): `YAROPAY_API_URL` (default `http://localhost:4000`). The dashboard proxies `/api` and `/v1` to the API so the session cookie stays first-party. Next.js compiles rewrites at build time, so set it before `next build` (the Dockerfile takes it as a build argument).
 

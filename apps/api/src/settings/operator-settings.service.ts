@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { OperatorSettingKey } from "@yaropay/core/platform"
+import { LOG_LEVELS, type LogLevel, type OperatorSettingKey, PASSWORD_HASH_COSTS, type PasswordHashCost } from "@yaropay/core/platform"
 import { eq, sql } from "drizzle-orm"
 import { EncryptionService } from "../common/encryption.service.js"
+import { setRuntimeLogLevel } from "../common/log-level.js"
+import { APP_CONFIG, type AppConfig } from "../config/config.js"
 import { DB } from "../database/database.module.js"
 import type { Db } from "../database/db.js"
 import { settings } from "../database/schema.js"
@@ -13,9 +15,29 @@ export interface OperatorOverrides {
   smtpUrl: string | null
   mailFrom: string | null
   v1RateLimitPerMinute: number | null
+  gatewayTimeoutMs: number | null
+  webhookTimeoutMs: number | null
+  sessionDays: number | null
+  passwordHashCost: PasswordHashCost | null
+  logLevel: LogLevel | null
+  workerIntervalMs: number | null
 }
 
-const EMPTY: OperatorOverrides = { billingPaystackSecretKey: null, smtpUrl: null, mailFrom: null, v1RateLimitPerMinute: null }
+const EMPTY: OperatorOverrides = {
+  billingPaystackSecretKey: null,
+  smtpUrl: null,
+  mailFrom: null,
+  v1RateLimitPerMinute: null,
+  gatewayTimeoutMs: null,
+  webhookTimeoutMs: null,
+  sessionDays: null,
+  passwordHashCost: null,
+  logLevel: null,
+  workerIntervalMs: null,
+}
+
+/** A text column holding one of a fixed set of values; anything else (edited by hand) counts as not saved. */
+const oneOf = <T extends string>(values: readonly T[], v: string | null): T | null => (v !== null && (values as readonly string[]).includes(v) ? (v as T) : null)
 
 /**
  * Other API instances pick up a change within this long; the instance that saved it, at once. Reading
@@ -25,8 +47,9 @@ export const OPERATOR_SETTINGS_TTL_MS = 10_000
 
 /**
  * Operator settings the super admin can change from the console instead of the server's .env (billing
- * key, email, product API limit). Each consumer applies its own precedence: the saved value if there is
- * one, otherwise its env value. Kept in memory so hot paths (the per-request rate limit) never wait.
+ * key, email, limits, timeouts, sessions, logging). A saved value wins over the env value; the getters
+ * below apply that for the settings that have one. Kept in memory so hot paths (the per-request rate
+ * limit, every gateway call) never wait.
  */
 @Injectable()
 export class OperatorSettingsService implements OnModuleInit {
@@ -34,12 +57,17 @@ export class OperatorSettingsService implements OnModuleInit {
   private snapshot: OperatorOverrides = EMPTY
   private loadedAt = 0
   private loading: Promise<OperatorOverrides> | null = null
+  /** The log level last applied to the running logger; starts as the one the app was created with. */
+  private appliedLogLevel: LogLevel
 
   constructor(
     @Inject(DB) private readonly db: Db,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly settings: SettingsService,
     private readonly encryption: EncryptionService,
-  ) {}
+  ) {
+    this.appliedLogLevel = config.logLevel
+  }
 
   async onModuleInit() {
     await this.reload()
@@ -55,6 +83,39 @@ export class OperatorSettingsService implements OnModuleInit {
   async get(): Promise<OperatorOverrides> {
     if (Date.now() - this.loadedAt > OPERATOR_SETTINGS_TTL_MS) return this.reload()
     return this.snapshot
+  }
+
+  // The value in use for each runtime setting: saved in the console, otherwise the server's env (or default).
+
+  /** How long a call to a gateway's API may take. */
+  gatewayTimeoutMs(): number {
+    return this.current().gatewayTimeoutMs ?? this.config.gateways.timeoutMs
+  }
+
+  /** How long a delivery to a product's webhook endpoint (or an alert webhook) may take. */
+  webhookTimeoutMs(): number {
+    return this.current().webhookTimeoutMs ?? this.config.webhookTimeoutMs
+  }
+
+  /** How long a sign-in lasts without activity, for sessions created or renewed from now on. */
+  sessionDays(): number {
+    return this.current().sessionDays ?? this.config.sessionDays
+  }
+
+  /** The hashing cost for passwords set from now on. Production always uses standard. */
+  passwordCost(): PasswordHashCost {
+    if (this.config.isProduction) return "standard"
+    return this.current().passwordHashCost ?? this.config.passwordCost
+  }
+
+  /** The wait between the background workers' rounds. */
+  workerIntervalMs(): number {
+    return this.current().workerIntervalMs ?? this.config.workerIntervalMs
+  }
+
+  /** What the API logs. */
+  logLevel(): LogLevel {
+    return this.current().logLevel ?? this.config.logLevel
   }
 
   async set(key: OperatorSettingKey, value: string | number): Promise<OperatorOverrides> {
@@ -85,6 +146,18 @@ export class OperatorSettingsService implements OnModuleInit {
         return { mailFrom: value === null ? null : String(value) }
       case "v1RateLimitPerMinute":
         return { v1RateLimitPerMinute: value === null ? null : Number(value) }
+      case "gatewayTimeoutMs":
+        return { gatewayTimeoutMs: value === null ? null : Number(value) }
+      case "webhookTimeoutMs":
+        return { webhookTimeoutMs: value === null ? null : Number(value) }
+      case "sessionDays":
+        return { sessionDays: value === null ? null : Number(value) }
+      case "passwordHashCost":
+        return { passwordHashCost: value === null ? null : String(value) }
+      case "logLevel":
+        return { logLevel: value === null ? null : String(value) }
+      case "workerIntervalMs":
+        return { workerIntervalMs: value === null ? null : Number(value) }
     }
   }
 
@@ -95,6 +168,7 @@ export class OperatorSettingsService implements OnModuleInit {
       .then((values) => {
         this.snapshot = values
         this.loadedAt = Date.now()
+        this.applyLogLevel(values)
         return values
       })
       .finally(() => {
@@ -104,6 +178,14 @@ export class OperatorSettingsService implements OnModuleInit {
     return run
   }
 
+  /** Changes the running logger's level when the level in use changed (on this instance or another). */
+  private applyLogLevel(values: OperatorOverrides) {
+    const level = values.logLevel ?? this.config.logLevel
+    if (level === this.appliedLogLevel) return
+    this.appliedLogLevel = level
+    setRuntimeLogLevel(level)
+  }
+
   private async read(): Promise<OperatorOverrides> {
     const [row] = await this.db
       .select({
@@ -111,6 +193,12 @@ export class OperatorSettingsService implements OnModuleInit {
         smtpUrlEnc: settings.smtpUrlEnc,
         mailFrom: settings.mailFrom,
         v1RateLimitPerMinute: settings.v1RateLimitPerMinute,
+        gatewayTimeoutMs: settings.gatewayTimeoutMs,
+        webhookTimeoutMs: settings.webhookTimeoutMs,
+        sessionDays: settings.sessionDays,
+        passwordHashCost: settings.passwordHashCost,
+        logLevel: settings.logLevel,
+        workerIntervalMs: settings.workerIntervalMs,
       })
       .from(settings)
       .where(eq(settings.id, 1))
@@ -120,6 +208,12 @@ export class OperatorSettingsService implements OnModuleInit {
       smtpUrl: this.open(row.smtpUrlEnc, "SMTP URL"),
       mailFrom: row.mailFrom,
       v1RateLimitPerMinute: row.v1RateLimitPerMinute,
+      gatewayTimeoutMs: row.gatewayTimeoutMs,
+      webhookTimeoutMs: row.webhookTimeoutMs,
+      sessionDays: row.sessionDays,
+      passwordHashCost: oneOf(PASSWORD_HASH_COSTS, row.passwordHashCost),
+      logLevel: oneOf(LOG_LEVELS, row.logLevel),
+      workerIntervalMs: row.workerIntervalMs,
     }
   }
 
