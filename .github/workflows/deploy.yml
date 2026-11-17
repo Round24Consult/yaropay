@@ -7,6 +7,11 @@ name: Deploy
 # Repository variables: DEPLOY_HOST (server IP), APP_DOMAIN (e.g. app.yaropay.com), DEPLOY_USER (default: deploy)
 # Repository secrets:   DEPLOY_SSH_KEY (private key of the `deploy` user), DEPLOY_KNOWN_HOSTS (the server's host keys),
 #                       EE_DEPLOY_KEY (read-only deploy key of the private yaropay-ee repository)
+#
+# Server settings: every secret or variable named ENV_<KEY> (on the repository or its `production`
+# environment) is merged into the server's .env as <KEY> before the restart, so settings change without
+# SSH: edit it on GitHub, then Actions -> Deploy -> Run workflow. See "Changing server settings from
+# GitHub" in the README.
 
 on:
   workflow_run:
@@ -74,6 +79,8 @@ jobs:
     name: Restart the stack on the server
     needs: images
     runs-on: ubuntu-latest
+    # Settings for the server (ENV_* secrets and variables) can live on this environment.
+    environment: production
     timeout-minutes: 15
     env:
       HOST: ${{ vars.DEPLOY_HOST }}
@@ -93,7 +100,31 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       - name: Copy stack files
-        run: scp -q deploy/compose.yml deploy/Caddyfile "$DEPLOY_USER@$HOST:/opt/yaropay/"
+        run: scp -q deploy/compose.yml deploy/Caddyfile deploy/apply-env.py "$DEPLOY_USER@$HOST:/opt/yaropay/"
+      - name: Back up the database
+        run: |
+          ssh "$DEPLOY_USER@$HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/yaropay
+          # A backup right before every deploy, so a migration can always be undone. Keeps the last 10.
+          # (`< /dev/null`: this script itself arrives on stdin, and `exec` would swallow the rest of it.)
+          if docker compose ps --status running --services | grep -qx postgres; then
+            docker compose exec -T postgres pg_dump -U yaropay -Fc yaropay > "backups/pre-deploy-$(date -u +%Y%m%d-%H%M%S).dump" < /dev/null
+            ls -1t backups/pre-deploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f
+          fi
+          REMOTE
+      - name: Apply server settings from GitHub
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+          ALL_VARS: ${{ toJSON(vars) }}
+        run: |
+          set -o pipefail
+          # ENV_<KEY> secrets and variables become <KEY> in the server's .env; a secret wins over a variable
+          # of the same name. Values travel on stdin only (never in a command line or the log), and
+          # apply-env.py prints key names only.
+          printf '%s\n%s\n' "$ALL_VARS" "$ALL_SECRETS" \
+            | jq -sc 'map(to_entries | map(select(.key | startswith("ENV_")) | .key |= ltrimstr("ENV_")) | from_entries) | add // {}' \
+            | ssh "$DEPLOY_USER@$HOST" 'python3 /opt/yaropay/apply-env.py /opt/yaropay/.env'
       - name: Pull images and restart
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,12 +135,6 @@ jobs:
           ssh "$DEPLOY_USER@$HOST" API_IMAGE="$IMAGE_PREFIX-api:$SHA" WEB_IMAGE="$IMAGE_PREFIX-web:$SHA" 'bash -s' <<'REMOTE'
           set -euo pipefail
           cd /opt/yaropay
-          # A backup right before every deploy, so a migration can always be undone. Keeps the last 10.
-          # (`< /dev/null`: this script itself arrives on stdin, and `exec` would swallow the rest of it.)
-          if docker compose ps --status running --services | grep -qx postgres; then
-            docker compose exec -T postgres pg_dump -U yaropay -Fc yaropay > "backups/pre-deploy-$(date -u +%Y%m%d-%H%M%S).dump" < /dev/null
-            ls -1t backups/pre-deploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f
-          fi
           # Record the deployed images in .env, so `docker compose` works by hand on the server too.
           sed -i '/^API_IMAGE=/d;/^WEB_IMAGE=/d' .env
           printf 'API_IMAGE=%s\nWEB_IMAGE=%s\n' "$API_IMAGE" "$WEB_IMAGE" >> .env

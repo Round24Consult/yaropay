@@ -31,6 +31,9 @@ jobs:
       - run: npm run lint
       # Core unit tests and the API suite (in-memory PGlite, fake Paystack/Flutterwave).
       - run: npm test
+      # The script the deploy uses to merge ENV_* settings from GitHub into the server's .env.
+      - name: Deploy settings merge
+        run: python3 deploy/test_apply_env.py
       # A newly scaffolded gateway must typecheck, and removing it must leave the tree as it was.
       - name: Gateway scaffold round trip
         run: |
