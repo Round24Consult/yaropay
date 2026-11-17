@@ -1,0 +1,27 @@
+{
+  "status": true,
+  "message": "Charge retrieved successfully",
+  "data": {
+    "reference": "SHW_FIXTURE002",
+    "status": "failed",
+    "amount": "15000.00",
+    "amount_paid": 0,
+    "fee": "161.25",
+    "currency": "NGN",
+    "description": "Shopwise",
+    "payment_attempts": [
+      {
+        "reference": "KPY-CM-fixture0001",
+        "status": "failed",
+        "channel": "card",
+        "message": "You are not allowed to make this payment with your card, please contact your bank or financial institution"
+      }
+    ],
+    "card": {
+      "card_type": "mastercard",
+      "first_six": "539983",
+      "last_four": "8381",
+      "expiry": "10/31"
+    }
+  }
+}

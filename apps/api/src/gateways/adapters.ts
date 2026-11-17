@@ -6,6 +6,7 @@ import { paystackAdapter } from "./paystack/adapter.js"
 import { stripeAdapter } from "./stripe/adapter.js"
 import { paypalAdapter } from "./paypal/adapter.js"
 import { monnifyAdapter } from "./monnify/adapter.js"
+import { korapayAdapter } from "./korapay/adapter.js"
 // gateway:imports
 
 /**
@@ -18,6 +19,7 @@ export const ADAPTERS: Partial<Record<GatewayId, GatewayAdapter>> = {
   stripe: stripeAdapter,
   paypal: paypalAdapter,
   monnify: monnifyAdapter,
+  korapay: korapayAdapter,
   // gateway:entries
 }
 

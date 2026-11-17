@@ -1,0 +1,13 @@
+{
+  "status": true,
+  "message": "Charge retrieved successfully",
+  "data": {
+    "reference": "SHW_FIXTURE003",
+    "status": "expired",
+    "amount": "15000.00",
+    "amount_paid": 0,
+    "fee": "0.00",
+    "currency": "NGN",
+    "description": "Shopwise"
+  }
+}

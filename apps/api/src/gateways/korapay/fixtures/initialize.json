@@ -1,0 +1,8 @@
+{
+  "status": true,
+  "message": "Charge created successfully",
+  "data": {
+    "reference": "SHW_FIXTURE001",
+    "checkout_url": "https://checkout.korapay.com/SHW_FIXTURE001/pay"
+  }
+}
