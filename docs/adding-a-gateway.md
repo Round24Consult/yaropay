@@ -86,10 +86,17 @@ and save the body in `fixtures/` (see the README there). `apps/api/src/gateways/
 is a complete example. Remove `pending: true` when the fixtures are in, and add tests for anything specific
 to the gateway beside the contract.
 
-## 5. Make it available and open a pull request
+## 5. Make it installable and open a pull request
 
-Set the definition's `status` to `"available"`. `apps/api/src/gateways/adapters.test.ts` then checks the
-gateway has an adapter and everything the dashboard needs. Run `npm run typecheck`, `npm run lint` and
+Set the definition's `status`:
+
+- `"beta"` when the contract tests pass but nobody has yet put a real sandbox payment through it end to
+  end (for example, fixtures built from the documentation's examples). It can be installed and used; the
+  dashboard shows a Beta badge.
+- `"available"` once a real sandbox payment, its webhook and its return to the product have all worked.
+
+`apps/api/src/gateways/adapters.test.ts` then checks the gateway has an adapter and everything the
+dashboard needs. Run `npm run typecheck`, `npm run lint` and
 `npm test`, then open a pull request titled after the gateway ("M-Pesa gateway"); a maintainer adds the
 `gateway` label so it's listed under "New gateways" in the release notes. Say in the description which
 sandbox flows you tried by hand.

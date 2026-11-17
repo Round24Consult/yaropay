@@ -185,10 +185,21 @@ export async function gatewayRequest<T>(ctx: AdapterContext, gatewayName: string
     throw new GatewayError(`${gatewayName} rejected the secret key`, "auth", res.status)
   }
   if (!res.ok && res.status !== 404) {
-    const message = (body as { message?: string } | null)?.message ?? `HTTP ${res.status}`
-    throw new GatewayError(`${gatewayName}: ${message}`, "request", res.status)
+    throw new GatewayError(`${gatewayName}: ${errorMessage(body) ?? `HTTP ${res.status}`}`, "request", res.status)
   }
   return { status: res.status, body: body as T }
+}
+
+/**
+ * The human-readable error in a gateway's error body. Gateways put it in different places: `message`
+ * (Paystack, Flutterwave, PayPal), `error.message` (Stripe), `error_description` (OAuth token endpoints),
+ * `responseMessage` (Monnify).
+ */
+export function errorMessage(body: unknown): string | null {
+  const b = asRecord(body)
+  const candidates = [b.message, asRecord(b.error).message, b.error_description, b.responseMessage, typeof b.error === "string" ? b.error : null]
+  for (const c of candidates) if (typeof c === "string" && c.trim()) return c.trim().slice(0, 300)
+  return null
 }
 
 export function asRecord(v: unknown): Record<string, unknown> {

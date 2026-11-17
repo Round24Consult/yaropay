@@ -28,7 +28,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { CreatedProduct } from "@yaropay/core/api"
-import { gatewayRegistry, requireGateway } from "@yaropay/core/gateways/registry"
+import { installableGateways, requireGateway } from "@yaropay/core/gateways/registry"
+import { BetaBadge } from "@/components/shared/beta-badge"
 import { makeReference, suggestPrefix } from "@yaropay/core/routing"
 import { type ProductInput, productInputSchema } from "@yaropay/core/schemas"
 import type { GatewayConnection } from "@yaropay/core/types"
@@ -398,16 +399,17 @@ export function ProductWizard() {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {gatewayRegistry
-                    .filter((g) => g.status === "available")
-                    .map((g) => {
+                  {installableGateways.map((g) => {
                       const conns = installedByGateway(g.id)
                       return (
                         <div key={g.id} className="rounded-xl border">
                           <div className="flex items-center gap-3 p-3">
                             <GatewayMark gatewayId={g.id} />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium">{g.name}</p>
+                              <p className="flex items-center gap-1.5 text-sm font-medium">
+                                {g.name}
+                                {g.status === "beta" && <BetaBadge />}
+                              </p>
                               <p className="truncate text-xs text-muted-foreground">{g.tagline}</p>
                             </div>
                             {conns.length > 0 ? (

@@ -11,6 +11,7 @@ import { useCan } from "@/lib/auth"
 import { CHANNEL_LABELS, formatRelative } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { SampleBadge } from "@/components/onboarding/sample-badge"
+import { BetaBadge } from "@/components/shared/beta-badge"
 
 export function GatewayCard({ item, onInstall }: { item: GatewayListItem; onInstall: (gatewayId: string) => void }) {
   const { gateway, connections } = item
@@ -31,7 +32,10 @@ export function GatewayCard({ item, onInstall }: { item: GatewayListItem; onInst
           <Badge variant="outline">Not installed</Badge>
         )}
       </div>
-      <h3 className="mt-4 font-semibold">{gateway.name}</h3>
+      <h3 className="mt-4 flex items-center gap-2 font-semibold">
+        {gateway.name}
+        {gateway.status === "beta" && <BetaBadge />}
+      </h3>
       <p className="mt-1 text-sm text-muted-foreground text-pretty">{gateway.tagline}</p>
 
       {!soon && (

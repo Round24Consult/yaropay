@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group"
 import { buildCredentialSchema } from "@yaropay/core/gateways/credentials"
 import { requireGateway } from "@yaropay/core/gateways/registry"
-import type { GatewayDefinition } from "@yaropay/core/gateways/types"
+import { BETA_GATEWAY_NOTE, type GatewayDefinition } from "@yaropay/core/gateways/types"
+import { BetaBadge } from "@/components/shared/beta-badge"
 import type { GatewayConnection, Mode } from "@yaropay/core/types"
 import { ApiRequestError } from "@/lib/api/client"
 import { useConnections, useInstallConnection, useTestConnection } from "@/lib/api/hooks"
@@ -189,6 +190,12 @@ function InstallFlow({
           Add your {gateway.name} keys once. Every product you attach to this account will use them, and YaroPay keeps each
           product&apos;s payments separate.
         </DialogDescription>
+        {gateway.status === "beta" && (
+          <p className="mt-2 flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning-text" data-testid="beta-note">
+            <BetaBadge className="shrink-0" />
+            <span>{BETA_GATEWAY_NOTE} Try a test payment before going live, and tell us if anything looks wrong.</span>
+          </p>
+        )}
       </DialogHeader>
 
       <FieldGroup className="mt-5 gap-5">

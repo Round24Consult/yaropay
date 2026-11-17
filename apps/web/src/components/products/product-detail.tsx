@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ProductWithStats, RotateTarget } from "@yaropay/core/api"
-import { gatewayRegistry, requireGateway } from "@yaropay/core/gateways/registry"
+import { installableGateways, requireGateway } from "@yaropay/core/gateways/registry"
 import { productDetailsSchema, productUrlsSchema } from "@yaropay/core/schemas"
 import type { GatewayConnection } from "@yaropay/core/types"
 import { ApiRequestError } from "@/lib/api/client"
@@ -212,9 +212,7 @@ function GatewaysTab({ product, connections }: { product: ProductWithStats; conn
   }
   return (
     <div className="space-y-4">
-      {gatewayRegistry
-        .filter((g) => g.status === "available")
-        .map((g) => {
+      {installableGateways.map((g) => {
           const conns = connections.filter((c) => c.gatewayId === g.id && (product.sample || !c.sample))
           return (
             <Panel key={g.id}>

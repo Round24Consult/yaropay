@@ -19,6 +19,11 @@ export interface GatewayFixtures {
   credentials: Credentials
   /** The account mode the fixtures were recorded in. Defaults to "test". */
   mode?: Mode
+  /**
+   * Calls the adapter makes alongside the one under test, such as an OAuth token endpoint. Served in
+   * every test; a test's own route wins when both match.
+   */
+  routes?: Partial<Record<Route, RecordedResponse>>
   initialize: {
     params: InitializeParams
     route: Route
@@ -76,7 +81,7 @@ export function describeGatewayContract(adapter: GatewayAdapter, load: () => Gat
     const mode = f.mode ?? "test"
 
     it("starts a checkout with the right request and returns its URL", async () => {
-      const gw = fakeGateway({ [f.initialize.route]: f.initialize.response }, mode)
+      const gw = fakeGateway({ ...f.routes, [f.initialize.route]: f.initialize.response }, mode)
       const result = await adapter.initialize(gw.ctx, f.credentials, f.initialize.params)
       expect(result.authorizationUrl).toBe(f.initialize.returns.authorizationUrl)
       if (f.initialize.returns.checkoutId !== undefined) expect(result.checkoutId ?? null).toBe(f.initialize.returns.checkoutId)
@@ -94,7 +99,7 @@ export function describeGatewayContract(adapter: GatewayAdapter, load: () => Gat
 
     for (const c of f.verify) {
       it(`verifies: ${c.name}`, async () => {
-        const gw = fakeGateway({ [c.route]: c.response }, mode)
+        const gw = fakeGateway({ ...f.routes, [c.route]: c.response }, mode)
         const payment = await adapter.verify(gw.ctx, f.credentials, c.ref)
         if (c.expect === null) {
           expect(payment).toBeNull()
@@ -109,7 +114,7 @@ export function describeGatewayContract(adapter: GatewayAdapter, load: () => Gat
     }
 
     it("accepts a correctly signed webhook and refuses tampered or unsigned ones", async () => {
-      const gw = fakeGateway(f.webhook.routes ?? {}, mode)
+      const gw = fakeGateway({ ...f.routes, ...f.webhook.routes }, mode)
       const raw = Buffer.from(f.webhook.signed.rawBody)
       const headers = f.webhook.signed.headers
       expect(await adapter.verifySignature(gw.ctx, f.credentials, raw, headers)).toBe(true)
@@ -138,9 +143,9 @@ export function describeGatewayContract(adapter: GatewayAdapter, load: () => Gat
     }
 
     it("tests a connection: accepted and rejected keys", async () => {
-      const ok = fakeGateway({ [f.testConnection.route]: f.testConnection.ok }, mode)
+      const ok = fakeGateway({ ...f.routes, [f.testConnection.route]: f.testConnection.ok }, mode)
       expect(await adapter.testConnection(ok.ctx, f.credentials)).toMatchObject({ ok: true })
-      const rejected = fakeGateway({ [f.testConnection.route]: f.testConnection.rejected ?? { status: 401, body: { message: "Invalid key" } } }, mode)
+      const rejected = fakeGateway({ ...f.routes, [f.testConnection.route]: f.testConnection.rejected ?? { status: 401, body: { message: "Invalid key" } } }, mode)
       expect(await adapter.testConnection(rejected.ctx, f.credentials)).toMatchObject({ ok: false })
     })
 
@@ -148,7 +153,7 @@ export function describeGatewayContract(adapter: GatewayAdapter, load: () => Gat
       it("completes an approved payment when the customer returns", async () => {
         expect(f.finalize, "this adapter implements finalize: add a finalize fixture").toBeDefined()
         if (!f.finalize || !adapter.finalize) return
-        const gw = fakeGateway({ [f.finalize.route]: f.finalize.response }, mode)
+        const gw = fakeGateway({ ...f.routes, [f.finalize.route]: f.finalize.response }, mode)
         await adapter.finalize(gw.ctx, f.credentials, f.finalize.params)
         const [method, path] = f.finalize.route.split(" ")
         expect(gw.sent.some((r) => r.method === method && r.path.split("?")[0] === path.split("?")[0])).toBe(true)

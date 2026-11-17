@@ -20,7 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PERIOD_PRESETS } from "@yaropay/core/analytics"
-import { gatewayRegistry } from "@yaropay/core/gateways/registry"
+import { installableGateways } from "@yaropay/core/gateways/registry"
 import { CURRENCIES } from "@yaropay/core/money"
 import type { ColorSlot, CurrencyCode } from "@yaropay/core/types"
 import { cn } from "@/lib/utils"
@@ -198,7 +198,7 @@ export function PeriodControl({
 }
 
 export function GatewaySelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const available = gatewayRegistry.filter((g) => g.status === "available")
+  const available = installableGateways
   return (
     <Select value={value[0] ?? "all"} onValueChange={(v) => onChange(v === "all" ? [] : [v])}>
       <SelectTrigger size="sm" className="h-8 w-auto min-w-36 gap-2" aria-label="Gateway">
