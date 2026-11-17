@@ -1,0 +1,38 @@
+{
+  "eventType": "SUCCESSFUL_TRANSACTION",
+  "eventData": {
+    "product": {
+      "reference": "SHW_FIXTURE001",
+      "type": "API_NOTIFICATION"
+    },
+    "transactionReference": "MNFY|20261117120230|000123",
+    "paymentReference": "SHW_FIXTURE001",
+    "paidOn": "2026-11-17 13:04:11.0",
+    "paymentDescription": "Shopwise",
+    "metaData": {
+      "yaropay_product": "prd_fixture1",
+      "orderId": "1042",
+      "yaropay_reference": "SHW_FIXTURE001"
+    },
+    "paymentSourceInformation": [],
+    "destinationAccountInformation": {},
+    "amountPaid": 15000,
+    "totalPayable": 15000,
+    "cardDetails": {
+      "cardType": "MASTERCARD",
+      "last4": "1111",
+      "expMonth": "10",
+      "expYear": "29",
+      "bin": "511111",
+      "reusable": false
+    },
+    "paymentMethod": "CARD",
+    "currency": "NGN",
+    "settlementAmount": "14892.50",
+    "paymentStatus": "PAID",
+    "customer": {
+      "email": "kemi@example.com",
+      "name": "Kemi Adeyemi"
+    }
+  }
+}

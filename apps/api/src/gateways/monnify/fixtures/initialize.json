@@ -1,0 +1,16 @@
+{
+  "requestSuccessful": true,
+  "responseMessage": "success",
+  "responseCode": "0",
+  "responseBody": {
+    "transactionReference": "MNFY|20261117120230|000123",
+    "paymentReference": "SHW_FIXTURE001",
+    "merchantName": "Shopwise",
+    "apiKey": "MK_TEST_FIXTURE01",
+    "enabledPaymentMethod": [
+      "ACCOUNT_TRANSFER",
+      "CARD"
+    ],
+    "checkoutUrl": "https://sandbox.sdk.monnify.com/checkout/MNFY|20261117120230|000123"
+  }
+}

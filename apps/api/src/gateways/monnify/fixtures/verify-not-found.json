@@ -1,0 +1,5 @@
+{
+  "requestSuccessful": false,
+  "responseMessage": "Could not find transaction with the specified payment reference",
+  "responseCode": "99"
+}

@@ -5,6 +5,7 @@ import { flutterwaveAdapter } from "./flutterwave/adapter.js"
 import { paystackAdapter } from "./paystack/adapter.js"
 import { stripeAdapter } from "./stripe/adapter.js"
 import { paypalAdapter } from "./paypal/adapter.js"
+import { monnifyAdapter } from "./monnify/adapter.js"
 // gateway:imports
 
 /**
@@ -16,6 +17,7 @@ export const ADAPTERS: Partial<Record<GatewayId, GatewayAdapter>> = {
   flutterwave: flutterwaveAdapter,
   stripe: stripeAdapter,
   paypal: paypalAdapter,
+  monnify: monnifyAdapter,
   // gateway:entries
 }
 
