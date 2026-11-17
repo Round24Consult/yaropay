@@ -101,6 +101,14 @@ export const settings = pgTable("settings", {
   smtpUrlEnc: text("smtp_url_enc"),
   mailFrom: text("mail_from"),
   v1RateLimitPerMinute: integer("v1_rate_limit_per_minute"),
+  gatewayTimeoutMs: integer("gateway_timeout_ms"),
+  webhookTimeoutMs: integer("webhook_timeout_ms"),
+  sessionDays: integer("session_days"),
+  /** "standard" or "fast" (production always uses standard). */
+  passwordHashCost: text("password_hash_cost"),
+  /** "error", "warn", "log", "debug" or "verbose". */
+  logLevel: text("log_level"),
+  workerIntervalMs: integer("worker_interval_ms"),
   /** Changes whenever an operator setting does, so every API instance knows to reload them. */
   operatorUpdatedAt: ts("operator_updated_at"),
   updatedAt: ts("updated_at").notNull().defaultNow(),

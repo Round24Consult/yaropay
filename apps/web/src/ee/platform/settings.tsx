@@ -2,7 +2,7 @@
 
 // YaroPay Enterprise License: see LICENSE.md in the parent folder.
 
-import type { OperatorSetting } from "@yaropay/core/platform"
+import { OPERATOR_SETTING_GROUPS, type OperatorSetting } from "@yaropay/core/platform"
 import { Loader2 } from "lucide-react"
 import * as React from "react"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiRequestError } from "@/lib/api/client"
 import { useClearOperatorSetting, useOperatorCheck, useOperatorSettings, useSetOperatorSetting } from "./hooks"
@@ -32,19 +33,31 @@ function OperatorSettings() {
   if (!data) {
     return (
       <div className="grid gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-40 rounded-2xl" />
         ))}
       </div>
     )
   }
   return (
-    <div className="grid gap-4">
-      {data.settings.map((s) => (
-        <SettingCard key={s.key} setting={s} />
-      ))}
+    <div className="grid gap-8">
+      {OPERATOR_SETTING_GROUPS.map((group) => {
+        const settings = data.settings.filter((s) => s.group === group.id)
+        if (settings.length === 0) return null
+        return (
+          <section key={group.id} className="grid gap-4" aria-labelledby={`operator-group-${group.id}`} data-testid={`operator-group-${group.id}`}>
+            <h2 id={`operator-group-${group.id}`} className="text-sm font-semibold tracking-tight text-muted-foreground">
+              {group.label}
+            </h2>
+            {settings.map((s) => (
+              <SettingCard key={s.key} setting={s} />
+            ))}
+          </section>
+        )
+      })}
       <p className="text-sm text-muted-foreground">
-        The encryption key, the database, the setup token and the edition stay in the server&apos;s .env: they can&apos;t be changed from the web.
+        The encryption key, the database, the setup token, the edition and anything the server only reads when it starts stay in the server&apos;s .env: they
+        can&apos;t be changed from the web.
       </p>
     </div>
   )
@@ -70,14 +83,17 @@ function SettingCard({ setting }: { setting: OperatorSetting }) {
   const [error, setError] = React.useState<string | null>(null)
   const source = SOURCE[setting.source]
   const extra = CHECKS[setting.key]
-  const current = setting.secret ? (setting.last4 ? `•••• ${setting.last4}` : null) : setting.value
+  const isNumber = Boolean(setting.unit)
+  const choices = setting.options
+  const inUse = setting.secret ? (setting.last4 ? `•••• ${setting.last4}` : null) : setting.value
+  const current = inUse !== null && setting.unit && !setting.secret ? `${Number(inUse).toLocaleString("en")} ${setting.unit}` : inUse
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!draft.trim()) return
     setError(null)
     try {
-      await guarded(() => save.mutateAsync({ key: setting.key, value: setting.key === "v1RateLimitPerMinute" ? Number(draft) : draft }))
+      await guarded(() => save.mutateAsync({ key: setting.key, value: isNumber ? Number(draft) : draft }))
       setDraft("")
       toast.success(`${setting.label} saved. It applies now.`)
     } catch (err) {
@@ -119,6 +135,7 @@ function SettingCard({ setting }: { setting: OperatorSetting }) {
         }
       />
       <div className="grid gap-4 p-5 pt-3">
+        {setting.note && <p className="text-sm text-muted-foreground">{setting.note}</p>}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
           <span>
             <span className="text-muted-foreground">In use: </span>
@@ -135,19 +152,43 @@ function SettingCard({ setting }: { setting: OperatorSetting }) {
             <FieldLabel htmlFor={`operator-input-${setting.key}`} className="sr-only">
               New value for {setting.label}
             </FieldLabel>
-            <Input
-              id={`operator-input-${setting.key}`}
-              data-testid={`operator-input-${setting.key}`}
-              type={setting.secret ? "password" : setting.key === "v1RateLimitPerMinute" ? "number" : "text"}
-              inputMode={setting.key === "v1RateLimitPerMinute" ? "numeric" : undefined}
-              autoComplete="off"
-              placeholder={setting.secret ? "Paste a new value to replace it" : "New value"}
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value)
-                setError(null)
-              }}
-            />
+            {choices ? (
+              <Select
+                value={draft}
+                onValueChange={(v) => {
+                  setDraft(v)
+                  setError(null)
+                }}
+              >
+                <SelectTrigger id={`operator-input-${setting.key}`} data-testid={`operator-input-${setting.key}`} className="w-full sm:w-56">
+                  <SelectValue placeholder="Choose a value" />
+                </SelectTrigger>
+                <SelectContent>
+                  {choices.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  id={`operator-input-${setting.key}`}
+                  data-testid={`operator-input-${setting.key}`}
+                  type={setting.secret ? "password" : isNumber ? "number" : "text"}
+                  inputMode={isNumber ? "numeric" : undefined}
+                  autoComplete="off"
+                  placeholder={setting.secret ? "Paste a new value to replace it" : "New value"}
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value)
+                    setError(null)
+                  }}
+                />
+                {setting.unit && <span className="shrink-0 text-sm text-muted-foreground">{setting.unit}</span>}
+              </div>
+            )}
             {error ? <FieldError>{error}</FieldError> : setting.secret && <FieldDescription>Saved values are never shown again, only their last 4 characters.</FieldDescription>}
           </Field>
           <div className="flex flex-wrap gap-2">

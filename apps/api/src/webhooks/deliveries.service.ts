@@ -5,6 +5,7 @@ import type { DeliveryState, Mode, WebhookDelivery } from "@yaropay/core/types"
 import { PLATFORM_SIGNATURE_HEADER } from "@yaropay/core/urls"
 import { and, asc, count, desc, eq, gte, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm"
 import { newId } from "../common/crypto.js"
+import { startLoop } from "../common/loop.js"
 import { EncryptionService } from "../common/encryption.service.js"
 import { conflict, notFound } from "../common/errors.js"
 import { FETCH, type FetchFn } from "../common/http.js"
@@ -17,6 +18,7 @@ import { type ProductRow, products, transactions, type WebhookDeliveryRow, webho
 import { productCondition, type Scope } from "../auth/scope.js"
 import { NotificationsService } from "../notifications/notifications.service.js"
 import { signPayload } from "./signing.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 /** Wait before attempt n+1 (attempt 1 is immediate). 8 attempts over about 45 hours. */
 export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000, 24 * 3_600_000]
@@ -46,7 +48,7 @@ export function toDeliveryDto(r: WebhookDeliveryRow): WebhookDelivery {
 @Injectable()
 export class DeliveriesService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger("Deliveries")
-  private timer: NodeJS.Timeout | null = null
+  private loop: { stop: () => void } | null = null
   private running = false
 
   constructor(
@@ -55,16 +57,16 @@ export class DeliveriesService implements OnApplicationBootstrap, OnModuleDestro
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly encryption: EncryptionService,
     private readonly notifications: NotificationsService,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   onApplicationBootstrap() {
     if (!this.config.workers) return
-    this.timer = setInterval(() => void this.tick(), this.config.workerIntervalMs)
-    this.timer.unref()
+    this.loop = startLoop(() => this.operator.workerIntervalMs(), () => this.tick())
   }
 
   onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer)
+    this.loop?.stop()
   }
 
   private async tick() {
@@ -182,6 +184,7 @@ export class DeliveriesService implements OnApplicationBootstrap, OnModuleDestro
       snippet = "Product was deleted"
     } else {
       const body = JSON.stringify(row.payload)
+      const timeoutMs = this.operator.webhookTimeoutMs()
       try {
         if (!this.config.webhookAllowPrivate) await assertPublicUrl(url)
         const res = await this.fetch(url, {
@@ -195,7 +198,7 @@ export class DeliveriesService implements OnApplicationBootstrap, OnModuleDestro
             [PLATFORM_SIGNATURE_HEADER]: signPayload(this.encryption.decrypt(product.signingSecretEnc), body),
           },
           body,
-          signal: AbortSignal.timeout(this.config.webhookTimeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
         })
         statusCode = res.status
         latencyMs = Date.now() - started
@@ -204,7 +207,7 @@ export class DeliveriesService implements OnApplicationBootstrap, OnModuleDestro
         if (res.status >= 300 && res.status < 400) snippet = `Redirects are not followed (Location: ${res.headers.get("location") ?? "?"})`
       } catch (e) {
         const err = e as Error
-        snippet = err.name === "TimeoutError" ? `No response within ${this.config.webhookTimeoutMs} ms` : err.message.slice(0, 300)
+        snippet = err.name === "TimeoutError" ? `No response within ${timeoutMs} ms` : err.message.slice(0, 300)
       }
     }
 

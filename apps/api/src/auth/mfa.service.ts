@@ -16,6 +16,7 @@ import { verifyPassword } from "./password.js"
 import { generateRecoveryCodes, generateTotpSecret, normaliseRecoveryCode, otpauthUri, verifyTotp } from "./totp.js"
 import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, SessionContext } from "./types.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 const DAY = 86_400_000
 /** Wrong codes allowed on one pending session before it is ended. */
@@ -40,6 +41,7 @@ export class MfaService {
     private readonly workspaces: WorkspacesService,
     private readonly encryption: EncryptionService,
     private readonly trusted: TrustedBrowsersService,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   private async user(id: string): Promise<UserRow> {
@@ -180,7 +182,7 @@ export class MfaService {
     const now = new Date()
     await this.db
       .update(sessions)
-      .set({ assurance: "mfa", authenticatedAt: now, lastSeenAt: now, mfaFailures: 0, expiresAt: new Date(now.getTime() + this.config.sessionDays * DAY) })
+      .set({ assurance: "mfa", authenticatedAt: now, lastSeenAt: now, mfaFailures: 0, expiresAt: new Date(now.getTime() + this.operator.sessionDays() * DAY) })
       .where(eq(sessions.id, session.id))
     await this.auth.signedIn(u, actor.workspaceId, meta, session.id)
     let trusted: { token: string; expiresAt: Date } | null = null

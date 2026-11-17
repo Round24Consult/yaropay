@@ -28,6 +28,7 @@ import { AllowInSupport, AllowPending, CurrentSession, CurrentUser, Public } fro
 import { MfaService } from "./mfa.service.js"
 import { TRUSTED_BROWSER_MS, TRUSTED_COOKIE, TRUSTED_COOKIE_PATH, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, SessionContext } from "./types.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
 const meta = (req: Request): ClientMeta => ({ ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null })
 const trustedToken = (req: Request): string | undefined => (req.cookies as Record<string, string | undefined> | undefined)?.[TRUSTED_COOKIE]
@@ -39,6 +40,7 @@ export class AuthController {
     private readonly mfa: MfaService,
     private readonly trusted: TrustedBrowsersService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   /** `pending`: the session only lasts long enough to enter the authenticator code. */
@@ -48,7 +50,7 @@ export class AuthController {
       sameSite: "lax",
       secure: this.config.cookieSecure,
       path: "/",
-      maxAge: pending ? PENDING_SESSION_MS : this.config.sessionDays * 86_400_000,
+      maxAge: pending ? PENDING_SESSION_MS : this.operator.sessionDays() * 86_400_000,
     })
   }
 

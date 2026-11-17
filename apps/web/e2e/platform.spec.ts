@@ -152,6 +152,21 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Server setting")
   // Secrets are never shown: an unset email server says so.
   await expect(page.getByTestId("operator-current-smtpUrl")).toHaveText("nothing")
+  // Grouped under headings; numbers show their unit, and a choice is picked from a list.
+  await expect(page.getByTestId("operator-group-limits").getByRole("heading", { name: "Limits & timeouts" })).toBeVisible()
+  const timeout = page.getByTestId("operator-setting-gatewayTimeoutMs")
+  await timeout.getByTestId("operator-input-gatewayTimeoutMs").fill("20000")
+  await timeout.getByTestId("operator-save-gatewayTimeoutMs").click()
+  await expect(page.getByTestId("operator-current-gatewayTimeoutMs")).toHaveText("20,000 ms")
+  await timeout.getByTestId("operator-clear-gatewayTimeoutMs").click()
+  await expect(page.getByTestId("operator-source-gatewayTimeoutMs")).toHaveText("Server setting")
+  const logLevel = page.getByTestId("operator-setting-logLevel")
+  await logLevel.getByTestId("operator-input-logLevel").click()
+  await page.getByRole("option", { name: "warn" }).click()
+  await logLevel.getByTestId("operator-save-logLevel").click()
+  await expect(page.getByTestId("operator-current-logLevel")).toHaveText("warn")
+  await logLevel.getByTestId("operator-clear-logLevel").click()
+  await expect(page.getByTestId("operator-source-logLevel")).toHaveText("Server setting")
 
   // Everything above is in the platform audit log.
   await page.goto("/platform/audit")

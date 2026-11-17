@@ -16,6 +16,7 @@ import { DB } from "../database/database.module.js"
 import type { Db, DbOrTx } from "../database/db.js"
 import { type ConnectionRow, connections, productGateways, products } from "../database/schema.js"
 import { NotificationsService } from "../notifications/notifications.service.js"
+import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 import { adapterFor } from "./adapters.js"
 import type { AdapterContext, Credentials, GatewayAdapter } from "./kit.js"
 
@@ -42,6 +43,7 @@ export class ConnectionsService {
     private readonly encryption: EncryptionService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly operator: OperatorSettingsService,
   ) {}
 
   /** Context the adapters use for calls to one gateway account (its gateway and mode decide the API host). */
@@ -49,7 +51,7 @@ export class ConnectionsService {
     const gateway = requireGateway(account.gatewayId)
     const mode = account.mode as Mode
     const baseUrl = this.config.gateways.apiUrls[gateway.id] ?? gatewayApiBaseUrl(gateway, mode)
-    return { fetch: this.fetch, baseUrl, mode, timeoutMs: this.config.gateways.timeoutMs }
+    return { fetch: this.fetch, baseUrl, mode, timeoutMs: this.operator.gatewayTimeoutMs() }
   }
 
   adapter(gatewayId: string): GatewayAdapter {

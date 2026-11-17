@@ -51,6 +51,8 @@ export class FakeNetwork {
   readonly refunds: string[] = []
   /** PayPal orders by id. */
   readonly paypalOrders = new Map<string, FakePayPalOrder>()
+  /** Hosts that never answer, like a hung server: a request waits until the caller's timeout gives up. */
+  readonly silentHosts = new Set<string>()
   private nextOrder = 1
 
   fetch = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
@@ -62,6 +64,7 @@ export class FakeNetwork {
     const body = typeof init.body === "string" ? init.body : ""
     const method = (init.method ?? "GET").toUpperCase()
     this.requests.push({ url: url.href, method, headers, body })
+    if (this.silentHosts.has(url.host)) return never(init.signal)
 
     if (url.host === "api.paystack.test") return this.paystack(url, method, headers, body)
     if (url.host === "api.flutterwave.test") return this.flutterwave(url, method, headers, body)
@@ -259,4 +262,13 @@ export class FakeNetwork {
     }
     return json(404, { name: "RESOURCE_NOT_FOUND", message: "Not found" })
   }
+}
+
+/** A response that never comes: rejects only when the caller's signal aborts (its timeout), as fetch does. */
+function never(signal: AbortSignal | null | undefined): Promise<Response> {
+  return new Promise((_, reject) => {
+    if (!signal) return
+    if (signal.aborted) return reject(signal.reason)
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+  })
 }
