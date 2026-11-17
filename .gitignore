@@ -30,3 +30,4 @@ apps/web/e2e/.auth/
 *.pem
 npm-debug.log*
 .vercel
+__pycache__/

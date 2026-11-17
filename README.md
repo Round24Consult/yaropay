@@ -89,6 +89,41 @@ This runs Postgres, the API, the dashboard (http://localhost:3000) and Mailpit (
 
 `.github/workflows/deploy.yml` runs after CI passes on `main`: it builds both images, pushes them to `ghcr.io/round24consult/yaropay-{api,web}` and restarts the stack over SSH. It stays off until the repository variable `DEPLOY_HOST` is set. Run it by hand with a commit SHA to roll back.
 
+#### Changing server settings from GitHub
+
+The server's settings live in `/opt/yaropay/.env`. You can change them without SSH: every GitHub Actions
+secret or variable named `ENV_<KEY>`, on the repository or on its `production` environment (which only
+`main` can deploy to), is written to that file as `<KEY>` on each deploy. `ENV_SMTP_URL` becomes
+`SMTP_URL`, `ENV_YAROPAY_CLOUD` becomes `YAROPAY_CLOUD`. Use a secret for anything sensitive and a
+variable for plain values; if both exist, the secret wins.
+
+To apply a change without a code change: edit the secret or variable on GitHub, then run **Actions →
+Deploy → Run workflow** with the commit left empty. The deploy:
+
+1. backs up the database, as on every deploy;
+2. merges the settings into `.env`: every other line stays as it is, the keys it was given are replaced
+   or added, and the previous file is kept as `.env.bak-<UTC time>` next to it (mode 0600, the last 5
+   are kept);
+3. restarts the services, so the new values take effect.
+
+The deploy log lists the names of the keys it changed or added, never their values. When nothing differs,
+it says so and leaves the file alone.
+
+Some keys can't be changed this way, and the deploy stops before restarting anything if one is set:
+
+| Key | Why |
+|---|---|
+| `YAROPAY_ENCRYPTION_KEY` | It encrypts every saved gateway key and secret; changing it outright makes them unreadable. Rotate it with the encryption key rotation steps; `YAROPAY_ENCRYPTION_KEY_PREVIOUS` can be set from GitHub for that. |
+| `POSTGRES_PASSWORD`, `POSTGRES_USER`, `POSTGRES_DB` | Postgres reads them only when the database is first created, so changing them breaks the API's connection. |
+| `API_IMAGE`, `WEB_IMAGE` | The deploy sets them to the images it just built. |
+
+Deleting a secret or variable on GitHub doesn't remove the key from the server's `.env`: set it to the
+value you want instead (for example the default), or remove the line on the server. Values must fit on
+one line.
+
+On YaroPay Cloud, values saved in **Platform → Settings** (the billing gateway key, email server and
+sender, and the product API limit) win over `.env`, whether `.env` was set by hand or from GitHub.
+
 ### Receiving gateway webhooks locally
 
 Gateways cannot reach `localhost`. Run a tunnel (for example `cloudflared tunnel --url http://localhost:3000`), set the tunnel URL as the base URL in **Settings > General**, and paste the webhook URL from **Apps** into the Paystack or Flutterwave dashboard. Customer redirects work without a tunnel.
