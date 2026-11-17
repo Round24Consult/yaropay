@@ -1,0 +1,36 @@
+{
+  "id": "evt_1FixtureAsyncFailed1",
+  "object": "event",
+  "created": 1794909300,
+  "livemode": false,
+  "type": "checkout.session.async_payment_failed",
+  "data": {
+    "object": {
+      "object": "checkout.session",
+      "mode": "payment",
+      "livemode": false,
+      "currency": "usd",
+      "amount_subtotal": 150000,
+      "amount_total": 150000,
+      "client_reference_id": "SHW_FIXTURE002",
+      "customer_email": "kemi@example.com",
+      "metadata": {
+        "yaropay_product": "prd_fixture1",
+        "yaropay_reference": "SHW_FIXTURE002"
+      },
+      "success_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?reference=SHW_FIXTURE001&session_id={CHECKOUT_SESSION_ID}",
+      "cancel_url": "https://pay.example.test/v1/callback/prd_fixture1/stripe?outcome=cancelled&ct=0123456789abcdef&reference=SHW_FIXTURE001",
+      "created": 1794909000,
+      "expires_at": 1794995400,
+      "ui_mode": "hosted_page",
+      "id": "cs_test_a1FixtureSessionFail1",
+      "status": "complete",
+      "payment_status": "unpaid",
+      "customer_details": {
+        "email": "kemi@example.com",
+        "name": "Kemi Adeyemi"
+      },
+      "payment_intent": "pi_3FixtureFail0001"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "resource_missing",
+    "message": "No such checkout.session: 'cs_test_unknown01'",
+    "param": "session",
+    "type": "invalid_request_error"
+  }
+}
