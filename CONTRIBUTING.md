@@ -13,6 +13,8 @@ YaroPay is open core:
   dashboard code lives in `ee` folders here, under the [YaroPay Enterprise License](ee/LICENSE.md).
   We don't accept outside changes to `ee` folders.
 
+Payment gateways are Community code, free in every edition: see [Adding a gateway](docs/adding-a-gateway.md).
+
 The core must build, test and run with no paid code present. Never import from an `ee` folder in core
 code; paid features plug in through the extension points in `apps/api/src/extension`.
 

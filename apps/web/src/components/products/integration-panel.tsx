@@ -52,7 +52,8 @@ export function IntegrationPanel({ product, baseUrl, connections, secrets }: Pro
     prefix: product.referencePrefix,
     mode,
   })
-  const firstPaystack = gatewayIds.includes("paystack") ? productCallbackUrl(baseUrl, product.id, "paystack") : null
+  // Direct mode: the first attached gateway whose definition has a direct-mode example.
+  const directGateway = gatewayIds.map((gid) => requireGateway(gid)).find((g) => g.directModeExample)
 
   return (
     <div className="grid gap-6 xl:grid-cols-5">
@@ -108,8 +109,17 @@ export function IntegrationPanel({ product, baseUrl, connections, secrets }: Pro
               tabs={[
                 { label: "cURL", code: snippets.curl },
                 { label: "Node.js", code: snippets.node },
-                ...(firstPaystack
-                  ? [{ label: "Direct mode", code: directModeSnippet({ callbackUrl: firstPaystack, productId: product.id, prefix: product.referencePrefix }) }]
+                ...(directGateway?.directModeExample
+                  ? [
+                      {
+                        label: "Direct mode",
+                        code: directModeSnippet(directGateway.directModeExample, {
+                          callbackUrl: productCallbackUrl(baseUrl, product.id, directGateway.id),
+                          productId: product.id,
+                          prefix: product.referencePrefix,
+                        }),
+                      },
+                    ]
                   : []),
               ]}
             />

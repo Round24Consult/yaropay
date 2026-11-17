@@ -1,0 +1,12 @@
+{
+  "event": "refund.processed",
+  "data": {
+    "status": "processed",
+    "transaction_reference": "SHW_FIXTURE001",
+    "amount": 1500000,
+    "currency": "NGN",
+    "customer": {
+      "email": "kemi@example.com"
+    }
+  }
+}

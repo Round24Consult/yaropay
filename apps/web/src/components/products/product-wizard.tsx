@@ -468,7 +468,7 @@ export function ProductWizard() {
                     })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  More gateways (Stripe, Monnify, Korapay) are on the way.{" "}
+                  More gateways are on the way, all free in every edition.{" "}
                   <Link href="/apps" className="font-medium text-primary hover:underline">
                     See apps
                   </Link>

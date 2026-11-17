@@ -1,0 +1,31 @@
+{
+  "status": true,
+  "message": "Verification successful",
+  "data": {
+    "id": 4099260516,
+    "domain": "test",
+    "status": "abandoned",
+    "reference": "SHW_FIXTURE003",
+    "amount": 1500000,
+    "message": null,
+    "gateway_response": "The transaction was not completed",
+    "paid_at": null,
+    "created_at": "2026-11-17T10:20:02.000Z",
+    "channel": null,
+    "currency": "NGN",
+    "ip_address": "102.89.0.1",
+    "metadata": {
+      "yaropay_product": "prd_fixture1",
+      "orderId": "1042"
+    },
+    "fees": null,
+    "customer": {
+      "id": 302961,
+      "first_name": "Kemi",
+      "last_name": "Adeyemi",
+      "email": "kemi@example.com",
+      "customer_code": "CUS_fixture0001",
+      "phone": null
+    }
+  }
+}

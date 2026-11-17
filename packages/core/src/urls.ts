@@ -1,5 +1,3 @@
-import type { GatewayId } from "./types.ts"
-
 /**
  * Every URL the platform hands out is derived from the install's public base
  * URL (Settings > General). Changing the base URL changes all of them.
@@ -11,12 +9,12 @@ export function normalizeBaseUrl(baseUrl: string): string {
 }
 
 /** Paste into the gateway dashboard once per installed account. */
-export function gatewayWebhookUrl(baseUrl: string, gatewayId: GatewayId, connectionId: string) {
+export function gatewayWebhookUrl(baseUrl: string, gatewayId: string, connectionId: string) {
   return `${normalizeBaseUrl(baseUrl)}/v1/webhooks/${gatewayId}/${connectionId}`
 }
 
 /** Fallback callback for the gateway dashboard (used when a transaction has none). */
-export function gatewayCallbackUrl(baseUrl: string, gatewayId: GatewayId, connectionId: string) {
+export function gatewayCallbackUrl(baseUrl: string, gatewayId: string, connectionId: string) {
   return `${normalizeBaseUrl(baseUrl)}/v1/callback/${gatewayId}/${connectionId}`
 }
 
@@ -25,12 +23,12 @@ export function gatewayCallbackUrl(baseUrl: string, gatewayId: GatewayId, connec
  * payments. YaroPay verifies the payment there, then redirects the customer to
  * the product's success, failure or cancel URL.
  */
-export function productCallbackUrl(baseUrl: string, productId: string, gatewayId: GatewayId) {
+export function productCallbackUrl(baseUrl: string, productId: string, gatewayId: string) {
   return `${normalizeBaseUrl(baseUrl)}/v1/callback/${productId}/${gatewayId}`
 }
 
 /** Cancel landing for gateways that support a separate cancel URL (Paystack cancel_action). */
-export function productCancelUrl(baseUrl: string, productId: string, gatewayId: GatewayId) {
+export function productCancelUrl(baseUrl: string, productId: string, gatewayId: string) {
   return `${productCallbackUrl(baseUrl, productId, gatewayId)}?outcome=cancelled`
 }
 

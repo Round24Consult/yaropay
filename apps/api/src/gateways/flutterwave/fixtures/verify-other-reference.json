@@ -1,0 +1,25 @@
+{
+  "status": "success",
+  "message": "Transaction fetched successfully",
+  "data": {
+    "id": 1163068,
+    "tx_ref": "RDN_SOMEONEELSE",
+    "flw_ref": "FLW-MOCK-fixture",
+    "amount": 65.5,
+    "currency": "GHS",
+    "charged_amount": 65.5,
+    "app_fee": 0.92,
+    "processor_response": "Approved",
+    "status": "successful",
+    "payment_type": "mobilemoneyghana",
+    "created_at": "2026-11-17T10:21:44.000Z",
+    "customer": {
+      "id": 255128,
+      "name": "Kofi Mensah",
+      "email": "kofi@example.com"
+    },
+    "meta": {
+      "yaropay_product": "prd_fixture2"
+    }
+  }
+}

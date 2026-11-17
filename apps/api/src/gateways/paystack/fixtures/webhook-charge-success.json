@@ -1,0 +1,27 @@
+{
+  "event": "charge.success",
+  "data": {
+    "id": 4099260516,
+    "domain": "test",
+    "status": "success",
+    "reference": "SHW_FIXTURE001",
+    "amount": 1500000,
+    "message": null,
+    "gateway_response": "Successful",
+    "paid_at": "2026-11-17T10:21:44.000Z",
+    "created_at": "2026-11-17T10:20:02.000Z",
+    "channel": "card",
+    "currency": "NGN",
+    "ip_address": "102.89.0.1",
+    "metadata": "{\"yaropay_product\":\"prd_fixture1\"}",
+    "fees": 32500,
+    "customer": {
+      "id": 302961,
+      "first_name": "Kemi",
+      "last_name": "Adeyemi",
+      "email": "kemi@example.com",
+      "customer_code": "CUS_fixture0001",
+      "phone": null
+    }
+  }
+}

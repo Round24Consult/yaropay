@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { DEFAULT_GATEWAY_ID, requireGateway } from "@yaropay/core/gateways/registry"
 import { CURRENCIES } from "@yaropay/core/money"
 import { settingsSchema } from "@yaropay/core/schemas"
 import type { PlatformSettings } from "@yaropay/core/types"
@@ -73,11 +74,12 @@ export function GeneralForm({ settings }: { settings: PlatformSettings }) {
   }
 
   const conn = connections[0]
+  const previewGateway = conn?.gatewayId ?? DEFAULT_GATEWAY_ID
   const previews: [string, string][] = [
-    [conn ? `${conn.gatewayId === "paystack" ? "Paystack" : "Flutterwave"} webhook` : "Paystack webhook", gatewayWebhookUrl(previewBase, conn?.gatewayId ?? "paystack", conn?.id ?? "con_example")],
+    [`${requireGateway(previewGateway).name} webhook`, gatewayWebhookUrl(previewBase, previewGateway, conn?.id ?? "con_example")],
     ...(products.length
-      ? products.slice(0, 2).map((p): [string, string] => [`${p.name} callback`, productCallbackUrl(previewBase, p.id, conn?.gatewayId ?? "paystack")])
-      : [["Product callback", productCallbackUrl(previewBase, "prd_example", "paystack")] as [string, string]]),
+      ? products.slice(0, 2).map((p): [string, string] => [`${p.name} callback`, productCallbackUrl(previewBase, p.id, previewGateway)])
+      : [["Product callback", productCallbackUrl(previewBase, "prd_example", previewGateway)] as [string, string]]),
   ]
 
   return (

@@ -31,6 +31,15 @@ jobs:
       - run: npm run lint
       # Core unit tests and the API suite (in-memory PGlite, fake Paystack/Flutterwave).
       - run: npm test
+      # A newly scaffolded gateway must typecheck, and removing it must leave the tree as it was.
+      - name: Gateway scaffold round trip
+        run: |
+          npm run gateway:new -- scaffold_check "Scaffold Check"
+          npm run build:core
+          npm run typecheck -w @yaropay/core -w @yaropay/api
+          npm run gateway:new -- scaffold_check --remove
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
 
   # The paid build (private yaropay-ee, mounted at apps/api/src/ee). Every other job runs without it,
   # which proves the open-source app builds and passes on its own.

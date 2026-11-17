@@ -7,8 +7,7 @@ import { scopeOf } from "../src/auth/scope.js"
 import { decrypt, encrypt } from "../src/common/crypto.js"
 import { isPrivateAddress } from "../src/common/ssrf.js"
 import { loadConfig } from "../src/config/config.js"
-import { flutterwaveAdapter, flutterwaveChannel } from "../src/gateways/adapters/flutterwave.js"
-import { paystackAdapter } from "../src/gateways/adapters/paystack.js"
+import { ConnectionsService } from "../src/gateways/connections.service.js"
 import { csvCell } from "../src/transactions/transactions.service.js"
 import { signPayload } from "../src/webhooks/signing.js"
 
@@ -48,33 +47,7 @@ describe("product webhook signatures", () => {
   })
 })
 
-describe("gateway adapters", () => {
-  it("verifies Paystack HMAC-SHA512 signatures over the raw body", () => {
-    const raw = Buffer.from('{"event":"charge.success"}')
-    const sig = createHmac("sha512", "sk_test_x").update(raw).digest("hex")
-    expect(paystackAdapter.verifySignature({ secretKey: "sk_test_x" }, raw, { "x-paystack-signature": sig })).toBe(true)
-    expect(paystackAdapter.verifySignature({ secretKey: "sk_test_x" }, Buffer.from('{"event":"charge.success" }'), { "x-paystack-signature": sig })).toBe(false)
-    expect(paystackAdapter.verifySignature({ secretKey: "sk_test_x" }, raw, {})).toBe(false)
-  })
-
-  it("compares the Flutterwave verif-hash", () => {
-    expect(flutterwaveAdapter.verifySignature({ secretHash: "h-123" }, Buffer.from("{}"), { "verif-hash": "h-123" })).toBe(true)
-    expect(flutterwaveAdapter.verifySignature({ secretHash: "h-123" }, Buffer.from("{}"), { "verif-hash": "h-124" })).toBe(false)
-    expect(flutterwaveAdapter.verifySignature({ secretHash: "" }, Buffer.from("{}"), { "verif-hash": "" })).toBe(false)
-  })
-
-  it("normalises webhook payloads and callback parameters", () => {
-    const ps = paystackAdapter.parseWebhook({ event: "charge.success", data: { id: 1, reference: "SHW_1", amount: 5000, currency: "NGN", status: "success", channel: "ussd", fees: 75, metadata: '{"yaropay_product":"prd_1"}' } })
-    expect(ps).toMatchObject({ type: "charge.success", reference: "SHW_1", metadata: { yaropay_product: "prd_1" }, payment: { status: "success", amount: 5000, channel: "ussd", fee: 75 } })
-    const refund = paystackAdapter.parseWebhook({ event: "refund.processed", data: { transaction_reference: "SHW_1", amount: 5000, currency: "NGN" } })
-    expect(refund.payment).toMatchObject({ status: "reversed", reference: "SHW_1" })
-    const fw = flutterwaveAdapter.parseWebhook({ event: "charge.completed", data: { id: 9, tx_ref: "RDN_1", amount: 65.5, currency: "GHS", status: "successful", payment_type: "mobilemoneyghana", app_fee: 0.92 } })
-    expect(fw.payment).toMatchObject({ amount: 6550, fee: 92, channel: "mobile_money", status: "success", gatewayTransactionId: "9" })
-    expect(flutterwaveAdapter.parseCallback({ status: "cancelled", tx_ref: "RDN_1" })).toMatchObject({ outcome: "cancelled", reference: "RDN_1" })
-    expect(paystackAdapter.parseCallback({ trxref: "SHW_1" })).toMatchObject({ reference: "SHW_1", outcome: null })
-    expect(flutterwaveChannel("account")).toBe("bank")
-  })
-})
+// Gateway adapters have their own tests next to them: src/gateways/<id>/adapter.test.ts.
 
 describe("guards and helpers", () => {
   it("recognises private addresses", () => {
@@ -110,5 +83,23 @@ describe("guards and helpers", () => {
     expect(ok.passwordCost).toBe("standard")
     expect(ok.cookieSecure).toBe(true)
     expect(ok.webhookAllowPrivate).toBe(false)
+  })
+
+  it("lets operators point any gateway at another API host with <ID>_API_URL", () => {
+    const defaults = loadConfig({ NODE_ENV: "test" })
+    expect(defaults.gateways.apiUrls).toEqual({})
+    expect(defaults.gateways.paystackUrl).toBe("https://api.paystack.co")
+    const proxied = loadConfig({ NODE_ENV: "test", PAYSTACK_API_URL: "https://proxy.example.test/paystack/", MONNIFY_API_URL: "https://monnify.proxy.test" })
+    expect(proxied.gateways.apiUrls).toEqual({ paystack: "https://proxy.example.test/paystack", monnify: "https://monnify.proxy.test" })
+    expect(proxied.gateways.paystackUrl).toBe("https://proxy.example.test/paystack")
+    expect(() => loadConfig({ NODE_ENV: "test", FLUTTERWAVE_API_URL: "not a url" })).toThrow(/FLUTTERWAVE_API_URL must be a URL/)
+  })
+
+  it("gives adapters the API host for the account's mode, unless the operator overrode it", () => {
+    const service = (env: Record<string, string>) => new ConnectionsService({} as never, fetch, loadConfig({ NODE_ENV: "test", ...env }), {} as never, {} as never, {} as never)
+    expect(service({}).context({ gatewayId: "monnify", mode: "test" })).toMatchObject({ baseUrl: "https://sandbox.monnify.com", mode: "test" })
+    expect(service({}).context({ gatewayId: "monnify", mode: "live" }).baseUrl).toBe("https://api.monnify.com")
+    expect(service({}).context({ gatewayId: "paystack", mode: "live" }).baseUrl).toBe("https://api.paystack.co")
+    expect(service({ MONNIFY_API_URL: "https://monnify.proxy.test" }).context({ gatewayId: "monnify", mode: "live" }).baseUrl).toBe("https://monnify.proxy.test")
   })
 })

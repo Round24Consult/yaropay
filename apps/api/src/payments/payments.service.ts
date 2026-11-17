@@ -24,7 +24,7 @@ import {
   webhookEvents,
   workspaces,
 } from "../database/schema.js"
-import { type GatewayPayment, GatewayError } from "../gateways/adapters/types.js"
+import { type CallbackParams, type GatewayPayment, GatewayError } from "../gateways/kit.js"
 import { ConnectionsService } from "../gateways/connections.service.js"
 import { NotificationsService } from "../notifications/notifications.service.js"
 import { SettingsService } from "../settings/settings.service.js"
@@ -165,6 +165,12 @@ export class PaymentsService {
     }
     const connection = await this.pickConnection(product, mode, input.gateway)
     const gateway = requireGateway(connection.gatewayId)
+    if (!gateway.currencies.includes(input.currency)) {
+      throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "Some fields need attention", {
+        code: "validation_failed",
+        fields: { currency: `${gateway.name} doesn't accept ${input.currency}. It accepts ${gateway.currencies.join(", ")}.` },
+      })
+    }
     const adapter = this.connections.adapter(connection.gatewayId)
     const reference = input.reference ?? makeReference(product.referencePrefix, () => randomInt(0, 2 ** 32) / 2 ** 32)
     const baseUrl = await this.settings.baseUrl()
@@ -203,7 +209,7 @@ export class PaymentsService {
     await this.recordLive(row, product)
 
     try {
-      const result = await adapter.initialize(this.connections.context(connection.gatewayId), this.connections.credentials(connection), {
+      const result = await adapter.initialize(this.connections.context(connection), this.connections.credentials(connection), {
         reference,
         amount: input.amount,
         currency: input.currency,
@@ -223,7 +229,7 @@ export class PaymentsService {
       )
       ;[row] = await this.db
         .update(transactions)
-        .set({ authorizationUrl: result.authorizationUrl, timeline: sql`${transactions.timeline} || ${JSON.stringify([redirected])}::jsonb`, updatedAt: new Date() })
+        .set({ authorizationUrl: result.authorizationUrl, checkoutId: result.checkoutId ?? null, timeline: sql`${transactions.timeline} || ${JSON.stringify([redirected])}::jsonb`, updatedAt: new Date() })
         .where(eq(transactions.id, row.id))
         .returning()
       await this.connections.markActive(connection)
@@ -263,9 +269,10 @@ export class PaymentsService {
     if (!connection) return null
     const adapter = this.connections.adapter(connection.gatewayId)
     try {
-      const payment = await adapter.verify(this.connections.context(connection.gatewayId), this.connections.credentials(connection), {
+      const payment = await adapter.verify(this.connections.context(connection), this.connections.credentials(connection), {
         reference: row.reference,
         gatewayTransactionId: gatewayTransactionId ?? row.gatewayTransactionId,
+        checkoutId: row.checkoutId,
       })
       await this.connections.markActive(connection)
       return payment
@@ -432,7 +439,7 @@ export class PaymentsService {
       if (!imported) return { kind: "redirect", url: this.redirectTo(product, null, "failed", params.reference) }
       row = imported
     }
-    return this.finishCallback(product, row, params, query.ct ?? null)
+    return this.finishCallback(product, row, params, query)
   }
 
   /** `/v1/callback/{gateway}/{connectionId}`: the gateway-dashboard fallback callback. */
@@ -452,7 +459,7 @@ export class PaymentsService {
       .where(and(eq(transactions.workspaceId, ws), eq(transactions.reference, params.reference)))
     if (!row) {
       const payment = await adapter
-        .verify(this.connections.context(gatewayId), this.connections.credentials(connection), { reference: params.reference, gatewayTransactionId: params.gatewayTransactionId })
+        .verify(this.connections.context(connection), this.connections.credentials(connection), { reference: params.reference, gatewayTransactionId: params.gatewayTransactionId, checkoutId: params.checkoutId ?? null })
         .catch(() => null)
       const route = payment ? resolveProduct(await this.routingTable(ws), payment.reference, payment.metadata) : null
       if (!payment || !route?.productId) {
@@ -462,7 +469,28 @@ export class PaymentsService {
       row = await this.importPayment(product, connection, payment, "fallback callback")
     }
     const [product] = await this.db.select().from(products).where(and(eq(products.workspaceId, ws), eq(products.id, row.productId)))
-    return this.finishCallback(product, row, params, query.ct ?? null)
+    return this.finishCallback(product, row, params, query)
+  }
+
+  /**
+   * Gives the gateway's adapter the chance to complete a payment the customer approved (PayPal captures
+   * the order). A failure here isn't fatal: verify, which runs next, reports where the payment stands.
+   */
+  private async finalizeRow(row: TransactionRowDb, params: CallbackParams, query: Record<string, string | undefined>) {
+    const adapter = this.connections.adapter(row.gatewayId)
+    if (!adapter.finalize) return
+    const connection = await this.connections.find(row.connectionId)
+    if (!connection) return
+    try {
+      await adapter.finalize(this.connections.context(connection), this.connections.credentials(connection), {
+        reference: row.reference,
+        gatewayTransactionId: params.gatewayTransactionId ?? row.gatewayTransactionId,
+        checkoutId: row.checkoutId ?? params.checkoutId ?? null,
+        query,
+      })
+    } catch (e) {
+      this.logger.warn(`Could not finalise ${row.reference} with ${row.gatewayId}: ${(e as Error).message}`)
+    }
   }
 
   private async findAndImport(product: ProductRow, gatewayId: string, reference: string, gatewayTransactionId: string | null, via: string) {
@@ -474,7 +502,7 @@ export class PaymentsService {
     for (const { connection } of attached) {
       const payment = await this.connections
         .adapter(gatewayId)
-        .verify(this.connections.context(gatewayId), this.connections.credentials(connection), { reference, gatewayTransactionId })
+        .verify(this.connections.context(connection), this.connections.credentials(connection), { reference, gatewayTransactionId })
         .catch(() => null)
       if (payment) return this.importPayment(product, connection, payment, via)
     }
@@ -484,9 +512,10 @@ export class PaymentsService {
   private async finishCallback(
     product: ProductRow,
     row: TransactionRowDb,
-    params: { reference: string | null; outcome: string | null; gatewayTransactionId: string | null },
-    cancelToken: string | null,
+    params: CallbackParams,
+    query: Record<string, string | undefined>,
   ): Promise<CallbackOutcome> {
+    const cancelToken = query.ct ?? null
     const gatewayName = requireGateway(row.gatewayId).name
     const callbackStep = step(
       "callback",
@@ -534,6 +563,7 @@ export class PaymentsService {
     if (TERMINAL.includes(row.status as TransactionStatus)) {
       return { kind: "redirect", url: this.redirectTo(product, row, this.outcomeOf(row.status as TransactionStatus), row.reference) }
     }
+    if (params.outcome !== "failed") await this.finalizeRow(row, params, query)
     let verified: GatewayPayment | null = null
     try {
       verified = await this.verifyRow(row, params.gatewayTransactionId)
@@ -586,7 +616,10 @@ export class PaymentsService {
     } catch {
       return { status: 400, body: { error: { message: "Body must be JSON" } } }
     }
-    const signatureValid = adapter.verifySignature(this.connections.credentials(connection), rawBody, headers)
+    const signatureValid = await adapter.verifySignature(this.connections.context(connection), this.connections.credentials(connection), rawBody, headers).catch((e: Error) => {
+      this.logger.warn(`Could not check a ${gatewayId} webhook signature: ${e.message}`)
+      return false
+    })
     if (!signatureValid) {
       // Forged or misconfigured posts are capped, so knowing the URL can't fill the database.
       const limit = this.invalidPosts.record(senderAddress, connectionId)

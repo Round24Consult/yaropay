@@ -1,4 +1,5 @@
-import type { CurrencyCode, GatewayId, Mode, PaymentChannel } from "../types.ts"
+import type { CurrencyCode } from "../currencies.ts"
+import type { Mode, PaymentChannel } from "../types.ts"
 
 export interface CredentialField {
   key: string
@@ -39,8 +40,19 @@ export interface GatewayWebhook {
   endpointsPerAccount: "one" | "many"
 }
 
-export interface GatewayDefinition {
-  id: GatewayId
+/** Where the gateway's server API lives. */
+export interface GatewayApi {
+  /**
+   * Base URL of the gateway's API, without a trailing slash. Use `{ test, live }` when sandbox and live
+   * accounts use different hosts. Operators can override it with `<ID>_API_URL` (for example
+   * `PAYSTACK_API_URL`) to go through a proxy, or to point tests at a fake.
+   */
+  baseUrl: string | Record<Mode, string>
+}
+
+export interface GatewayDefinition<Id extends string = string> {
+  /** Lowercase letters, digits and underscores; also the folder name and the `gateway` value in the API. */
+  id: Id
   name: string
   tagline: string
   description: string
@@ -58,4 +70,18 @@ export interface GatewayDefinition {
   dashboardSetupSteps: string[]
   /** Source IPs the platform may allow-list for incoming webhooks. */
   webhookIps?: string[]
+  api: GatewayApi
+  /**
+   * Example shown on a product's Integration tab for "direct mode": the product calls the gateway itself
+   * and keeps YaroPay in the loop through the callback URL, reference and metadata. Placeholders:
+   * {{callbackUrl}}, {{prefix}}, {{productId}} and {{metadataKey}}. Leave it out when the gateway has no
+   * such flow.
+   */
+  directModeExample?: string
+}
+
+/** The API base URL for an account in the given mode. */
+export function gatewayApiBaseUrl(def: Pick<GatewayDefinition, "api">, mode: Mode): string {
+  const url = typeof def.api.baseUrl === "string" ? def.api.baseUrl : def.api.baseUrl[mode]
+  return url.replace(/\/+$/, "")
 }

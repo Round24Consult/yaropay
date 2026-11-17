@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common"
+import { isCurrencyCode, minorUnitExponent, toMajorUnits } from "@yaropay/core/currencies"
 import { type PeriodPreset, resolvePeriod } from "@yaropay/core/analytics"
 import type { TransactionDetail, TransactionList, TransactionRow } from "@yaropay/core/api"
 import type { CurrencyCode, GatewayId, Mode, PaymentChannel, TimelineStep, Transaction, TransactionStatus } from "@yaropay/core/types"
@@ -54,6 +55,12 @@ export interface TransactionQuery {
 }
 
 type Dim = "product" | "gateway" | "status" | "channel"
+
+/** An amount in major units for the CSV export, with the currency's own decimal places ("15000.00", "1500" for JPY). */
+function majorAmount(minor: number, currency: string): string {
+  if (!isCurrencyCode(currency)) return (minor / 100).toFixed(2)
+  return toMajorUnits(minor, currency).toFixed(minorUnitExponent(currency))
+}
 
 @Injectable()
 export class TransactionsService {
@@ -171,8 +178,8 @@ export class TransactionsService {
           r.mode,
           r.status,
           r.channel ?? "",
-          (r.amount / 100).toFixed(2),
-          (r.fee / 100).toFixed(2),
+          majorAmount(r.amount, r.currency),
+          majorAmount(r.fee, r.currency),
           r.currency,
           r.customerEmail,
           r.customerName,
