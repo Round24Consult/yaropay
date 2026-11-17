@@ -4,7 +4,6 @@
 
 import { Loader2, ShieldAlert } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import * as React from "react"
 import { PasswordInput } from "@/components/auth/password-input"
 import { PageHeader, Panel } from "@/components/shared/page-header"
@@ -16,16 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ApiRequestError } from "@/lib/api/client"
 import { useReauth } from "@/lib/api/hooks"
 import { useMe } from "@/lib/auth"
-import { cn } from "@/lib/utils"
 import { usePlatformOverview } from "./hooks"
-
-const TABS = [
-  { href: "/platform", label: "Companies" },
-  { href: "/platform/people", label: "People" },
-  { href: "/platform/pricing", label: "Plans & pricing" },
-  { href: "/platform/settings", label: "Settings" },
-  { href: "/platform/audit", label: "Audit log" },
-]
 
 type Guarded = <T>(run: () => Promise<T>) => Promise<T>
 const ReauthContext = React.createContext<Guarded | null>(null)
@@ -42,7 +32,7 @@ export function useGuarded(): Guarded {
 
 export const isCancelled = (e: unknown) => e instanceof Error && e.message === "Cancelled"
 
-/** The platform console frame: access checks, tabs and the re-confirm dialog. */
+/** The platform console frame: access checks, the page header and the re-confirm dialog. (The menu is PlatformSidebar.) */
 export function PlatformShell({
   title,
   description,
@@ -55,7 +45,6 @@ export function PlatformShell({
   children: React.ReactNode
 }) {
   const me = useMe()
-  const pathname = usePathname()
   // The overview doubles as the access check: 404 for non-admins, 403 until two-step sign-in is on.
   const probe = usePlatformOverview()
   const pending = React.useRef<{
@@ -105,25 +94,7 @@ export function PlatformShell({
   return (
     <ReauthContext.Provider value={guarded}>
       <div className="space-y-6">
-        <PageHeader title={title} description={description} actions={actions}>
-          <nav className="flex gap-1 overflow-x-auto border-b" aria-label="Platform">
-            {TABS.map((t) => {
-              const active = t.href === "/platform" ? pathname === "/platform" || pathname.startsWith("/platform/workspaces") : pathname.startsWith(t.href)
-              return (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  className={cn(
-                    "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-                    active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t.label}
-                </Link>
-              )
-            })}
-          </nav>
-        </PageHeader>
+        <PageHeader title={title} description={description} actions={actions} />
         {probe.isLoading ? <Skeleton className="h-40" /> : children}
       </div>
       <ReauthDialog

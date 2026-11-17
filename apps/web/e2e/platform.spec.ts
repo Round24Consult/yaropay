@@ -23,7 +23,12 @@ test("a super admin opens the platform console after turning on two-step sign-in
   // Turning it on upgraded this session, so the console opens straight away.
   await page.getByTestId("nav-platform").click()
   await expect(page).toHaveURL(/\/platform$/)
+  // The console has its own menu: no company switcher or live/test switch.
+  await expect(page.getByTestId("platform-sidebar")).toContainText("YaroPay Platform")
+  await expect(page.getByTestId("current-workspace")).toHaveCount(0)
   await expect(page.getByTestId("platform-companies")).toContainText("1")
+  await page.getByTestId("console-nav-companies").click()
+  await expect(page).toHaveURL(/\/platform\/companies$/)
   await page.getByTestId("company-company-a").click()
   await expect(page.getByTestId("this-month")).toContainText(`isn't a Cloud plan`)
 
@@ -82,7 +87,7 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await guest.getByTestId("login-submit").click()
   await expect(guest.getByRole("heading", { name: "Check your email" })).toBeVisible()
   await visitor.close()
-  await page.goto("/platform")
+  await page.goto("/platform/companies")
   await expect(page.getByTestId("company-gamma-pay")).toContainText("Test mode only")
 
   // A read-only support view of the new company, then back.
@@ -96,7 +101,7 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await expect(page.getByTestId("support-banner")).toHaveCount(0)
 
   // A company for a customer: created, renamed, given a teammate, then closed and deleted.
-  await page.goto("/platform")
+  await page.goto("/platform/companies")
   await page.getByTestId("new-company").click()
   await page.getByTestId("new-company-name").fill("Delta Foods")
   await page.getByTestId("new-company-owner").fill("owner@delta.test")
@@ -121,7 +126,7 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await page.getByTestId("delete-company").click()
   await page.getByTestId("confirm-delete-name").fill("Delta Foods Ltd")
   await page.getByTestId("confirm-delete").click()
-  await expect(page).toHaveURL(/\/platform$/)
+  await expect(page).toHaveURL(/\/platform\/companies$/)
   await expect(page.getByText("Delta Foods Ltd deleted")).toBeVisible()
   await expect(page.getByTestId("company-delta-foods")).toHaveCount(0)
 
@@ -140,8 +145,9 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await page.getByTestId("confirm-person-action").click()
   await expect(chi).not.toContainText("Disabled")
 
-  // Platform → Settings: a sender saved here wins over the server's, and Clear goes back to it.
-  await page.goto("/platform/settings")
+  // Platform → Email: a sender saved here wins over the server's, and Clear goes back to it.
+  await page.getByTestId("console-nav-email").click()
+  await expect(page).toHaveURL(/\/platform\/email$/)
   const sender = page.getByTestId("operator-setting-mailFrom")
   await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Server setting")
   await sender.getByTestId("operator-input-mailFrom").fill("YaroPay Ops <ops@example.test>")
@@ -152,7 +158,14 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await expect(page.getByTestId("operator-source-mailFrom")).toHaveText("Server setting")
   // Secrets are never shown: an unset email server says so.
   await expect(page.getByTestId("operator-current-smtpUrl")).toHaveText("nothing")
-  // Grouped under headings; numbers show their unit, and a choice is picked from a list.
+  // Billing has its own page.
+  await page.getByTestId("console-nav-billing").click()
+  await expect(page.getByTestId("operator-setting-billingPaystackSecretKey")).toBeVisible()
+  // Next keeps the page it left in the document, hidden, so check visibility rather than count.
+  await expect(page.getByTestId("operator-setting-mailFrom")).toBeHidden()
+  // Platform → Settings: grouped under headings; numbers show their unit, and a choice is picked from a list.
+  await page.getByTestId("console-nav-settings").click()
+  await expect(page.getByTestId("operator-setting-smtpUrl")).toBeHidden()
   await expect(page.getByTestId("operator-group-limits").getByRole("heading", { name: "Limits & timeouts" })).toBeVisible()
   const timeout = page.getByTestId("operator-setting-gatewayTimeoutMs")
   await timeout.getByTestId("operator-input-gatewayTimeoutMs").fill("20000")
@@ -168,9 +181,33 @@ test("a super admin opens the platform console after turning on two-step sign-in
   await logLevel.getByTestId("operator-clear-logLevel").click()
   await expect(page.getByTestId("operator-source-logLevel")).toHaveText("Server setting")
 
+  // Platform → Gateways: turning Stripe off hides it from companies that never used it.
+  await page.getByTestId("console-nav-gateways").click()
+  await expect(page.getByTestId("platform-gateway-paystack")).toContainText("Paystack")
+  await page.getByTestId("gateway-offered-stripe").click()
+  await expect(page.getByText("Stripe is turned off for new accounts")).toBeVisible()
+  await expect(page.getByTestId("gateway-offered-stripe")).toHaveAttribute("aria-checked", "false")
+
+  // Platform → Invoices: every company's invoices, filtered by status.
+  await page.getByTestId("console-nav-invoices").click()
+  await expect(page.getByRole("heading", { name: "Invoices" })).toBeVisible()
+  await page.getByTestId("invoices-filter-overdue").click()
+  await expect(page.getByText("No overdue invoices.")).toBeVisible()
+
+  // Back to the company: its own menu again, and Stripe is gone from its Apps page.
+  await page.getByTestId("console-back").click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId("current-workspace")).toBeVisible()
+  await page.goto("/apps")
+  await expect(page.getByTestId("gateway-paystack")).toBeVisible()
+  await expect(page.getByTestId("gateway-stripe")).toHaveCount(0)
+  await page.goto("/platform/gateways")
+  await page.getByTestId("gateway-offered-stripe").click()
+  await expect(page.getByText("Stripe is offered to companies again")).toBeVisible()
+
   // Everything above is in the platform audit log.
-  await page.goto("/platform/audit")
-  for (const action of ["Changed a server setting", "Disabled an account", "Deleted a workspace", "Created a workspace", "Opened a support view", "Opened sign-ups", "Changed exchange rates", "Changed a plan's price", "Changed a workspace's billing"]) {
+  await page.getByTestId("console-nav-audit").click()
+  for (const action of ["Turned off Stripe for new accounts", "Offered Stripe to companies again", "Changed a server setting", "Disabled an account", "Deleted a workspace", "Created a workspace", "Opened a support view", "Opened sign-ups", "Changed exchange rates", "Changed a plan's price", "Changed a workspace's billing"]) {
     await expect(page.getByRole("cell", { name: new RegExp(action) }).first()).toBeVisible()
   }
 })

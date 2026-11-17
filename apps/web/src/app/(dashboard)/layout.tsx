@@ -1,6 +1,6 @@
 import { Suspense } from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
 import { ShellFallback } from "@/components/layout/shell-fallbacks"
+import { CompanyOnly, DashboardSidebar } from "@/components/layout/sidebar-switch"
 import { SupportBanner } from "@/components/layout/support-banner"
 import { Topbar } from "@/components/layout/topbar"
 import { SampleDataBanner } from "@/components/onboarding/sample-data"
@@ -15,12 +15,14 @@ export default function DashboardLayout({ children }: LayoutProps<"/">) {
       <ClientGate fallback={<ShellFallback />}>
         <AuthGate fallback={<ShellFallback />}>
           <SidebarProvider>
-            <AppSidebar />
+            <DashboardSidebar />
             <SidebarInset className="min-w-0">
               <Topbar />
               <SupportBanner />
-              <BillingBanner />
-              <SampleDataBanner />
+              <CompanyOnly>
+                <BillingBanner />
+                <SampleDataBanner />
+              </CompanyOnly>
               <div id="content" className="mx-auto w-full max-w-[1400px] min-w-0 flex-1 px-4 py-6 md:px-6 md:py-8">
                 {children}
               </div>

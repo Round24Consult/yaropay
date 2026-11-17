@@ -51,7 +51,7 @@ export function WorkspaceDetailPage({ id }: { id: string }) {
   const { data, error } = usePlatformWorkspace(id)
   return (
     <PlatformShell title={data?.name ?? "Company"} description={data ? `${data.slug} · joined ${formatDate(data.createdAt)}` : undefined} actions={data ? <StatusActions w={data} /> : null}>
-      <Link href="/platform" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/platform/companies" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> All companies
       </Link>
       {error ? (
@@ -168,7 +168,7 @@ function DeleteAction({ w }: { w: PlatformWorkspaceDetail }) {
               try {
                 await guarded(() => remove.mutateAsync(typed))
                 toast.success(`${w.name} deleted`)
-                router.push("/platform")
+                router.push("/platform/companies")
               } catch (err) {
                 if (!isCancelled(err)) toast.error(err instanceof Error ? err.message : "Could not delete")
               }
@@ -857,7 +857,7 @@ function Invoices({ w }: { w: PlatformWorkspaceDetail }) {
   )
 }
 
-function InvoiceAction({ invoice, kind, onDone }: { invoice: Invoice; kind: "paid" | "void"; onDone: () => void }) {
+export function InvoiceAction({ invoice, kind, onDone }: { invoice: Invoice; kind: "paid" | "void"; onDone: () => void }) {
   const guarded = useGuarded()
   const markPaid = useMarkInvoicePaid()
   const voidIt = useVoidInvoice()

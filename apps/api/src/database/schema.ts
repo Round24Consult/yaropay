@@ -111,6 +111,11 @@ export const settings = pgTable("settings", {
   workerIntervalMs: integer("worker_interval_ms"),
   /** Changes whenever an operator setting does, so every API instance knows to reload them. */
   operatorUpdatedAt: ts("operator_updated_at"),
+  /**
+   * Gateways the install's operator has turned off: companies can't add new accounts on them. Accounts
+   * already connected keep working and keep taking payments.
+   */
+  disabledGateways: text("disabled_gateways").array().notNull().default(sql`'{}'::text[]`),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 })
 

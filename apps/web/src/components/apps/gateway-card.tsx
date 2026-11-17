@@ -14,7 +14,7 @@ import { SampleBadge } from "@/components/onboarding/sample-badge"
 import { BetaBadge } from "@/components/shared/beta-badge"
 
 export function GatewayCard({ item, onInstall }: { item: GatewayListItem; onInstall: (gatewayId: string) => void }) {
-  const { gateway, connections } = item
+  const { gateway, connections, offered } = item
   const installed = connections.length > 0
   const soon = gateway.status === "coming_soon"
   const canInstall = useCan("gateways:write")
@@ -75,6 +75,10 @@ export function GatewayCard({ item, onInstall }: { item: GatewayListItem; onInst
               Learn more <ArrowUpRight />
             </a>
           </Button>
+        ) : !offered ? (
+          <span className="text-xs text-muted-foreground" data-testid={`gateway-off-${gateway.id}`}>
+            Turned off by YaroPay: your accounts keep working, but new ones can&apos;t be added.
+          </span>
         ) : !canInstall ? (
           <span className="text-xs text-muted-foreground">{installed ? "Managed by owners and admins" : "Ask an owner or admin to install it"}</span>
         ) : installed ? (

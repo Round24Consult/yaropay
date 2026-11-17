@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "disabled_gateways" text[] DEFAULT '{}'::text[] NOT NULL;

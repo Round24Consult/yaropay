@@ -23,15 +23,35 @@ import { formatDate, formatRelative } from "@/lib/format"
 import { useCreateWorkspace, usePlans, usePlatformOverview, usePlatformWorkspaces, useRunInvoicing } from "./hooks"
 import { isCancelled, PlatformShell, useGuarded } from "./platform-shell"
 
+/** Platform → Overview: this month across every company. */
+export function OverviewPage() {
+  return (
+    <PlatformShell title="Overview" description="This month across every company on YaroPay Cloud." actions={<RunInvoicing />}>
+      <Totals />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Shortcut href="/platform/companies" title="Companies" text="Every company: usage this month, plan, trial and status." />
+        <Shortcut href="/platform/invoices" title="Invoices" text="Every company's invoices, with what's open and overdue." />
+        <Shortcut href="/platform/gateways" title="Gateways" text="Which gateways companies can add accounts on." />
+      </div>
+    </PlatformShell>
+  )
+}
+
+function Shortcut({ href, title, text }: { href: string; title: string; text: string }) {
+  return (
+    <Link href={href} className="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Panel className="h-full p-5 transition-colors hover:bg-muted/40">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+      </Panel>
+    </Link>
+  )
+}
+
+/** Platform → Companies: every company, what it uses this month and what it will bill. */
 export function CompaniesPage() {
   return (
-    <PlatformShell title="Platform" description="Every company on YaroPay Cloud: what they use this month and what it will bill." actions={
-        <>
-          <RunInvoicing />
-          <NewCompany />
-        </>
-      }>
-      <Totals />
+    <PlatformShell title="Companies" description="Every company on YaroPay Cloud: what they use this month and what it will bill." actions={<NewCompany />}>
       <CompanyList />
     </PlatformShell>
   )
