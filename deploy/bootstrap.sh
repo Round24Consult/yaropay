@@ -12,9 +12,11 @@
 # copy YAROPAY_ENCRYPTION_KEY into your password manager, because database backups
 # can't decrypt saved gateway keys without it.
 #
-# HARDEN_SSH=1 also turns off SSH password logins (root keeps key logins). Only use it
-# once logging in with a key works, and after moving any tool that signs in with the
-# root password over to a key.
+# SSH becomes keys only: password logins are turned off (root keeps key logins), but
+# only when root, or the sudo user running this script, already has an SSH key in
+# authorized_keys. Without one, passwords stay on so you can't lock yourself out; add
+# your key and run the script again. Move any tool that signs in with the root password
+# over to a key first. HARDEN_SSH=0 leaves SSH as it is.
 set -euo pipefail
 
 : "${APP_DOMAIN:?Set APP_DOMAIN, e.g. app.yaropay.com}"
@@ -123,7 +125,22 @@ fi
 chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR/.env"
 chmod 600 "$APP_DIR/.env"
 
-if [ "${HARDEN_SSH:-0}" = 1 ]; then
+# True when a person can already sign in with a key: root, or whoever ran this with
+# sudo. The deploy user's key belongs to GitHub Actions, so it doesn't count.
+has_login_key() {
+  local home f
+  for home in /root ${SUDO_USER:+"$(getent passwd "$SUDO_USER" | cut -d: -f6)"}; do
+    f="$home/.ssh/authorized_keys"
+    if [ -f "$f" ] && grep -qE '^[^#]*(ssh-|ecdsa-|sk-)' "$f"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ "${HARDEN_SSH:-1}" = 0 ]; then
+  log "SSH: left as it is (HARDEN_SSH=0)"
+elif has_login_key; then
   log "SSH: keys only"
   # Read before the provider's 50-cloud-init.conf, so these values win.
   cat > /etc/ssh/sshd_config.d/10-yaropay.conf <<'EOF'
@@ -132,7 +149,12 @@ KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 EOF
   sshd -t
-  systemctl reload ssh
+  # Running sessions stay open; new logins need a key.
+  systemctl try-reload-or-restart ssh
+else
+  log "SSH: password logins left on"
+  echo "No SSH key found for root${SUDO_USER:+ or $SUDO_USER}, so password logins stay on to avoid locking you out." >&2
+  echo "Add your public key to ~/.ssh/authorized_keys, then run this script again." >&2
 fi
 
 log "Done"
