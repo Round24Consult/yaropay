@@ -85,7 +85,7 @@ This runs Postgres, the API, the dashboard (http://localhost:3000) and Mailpit (
 
 ### Hosted edition (our server)
 
-`deploy/` holds the production setup for the hosted edition: `compose.yml` (Caddy with automatic HTTPS, the dashboard, the API, Postgres and nightly `pg_dump` backups), the `Caddyfile`, and `bootstrap.sh`, which prepares a fresh Ubuntu server once (security updates, Docker, firewall, fail2ban, a `deploy` user and a server-only `.env` with generated secrets).
+`deploy/` holds the production setup for the hosted edition: `compose.yml` (Caddy with automatic HTTPS, the dashboard, the API, Postgres and nightly `pg_dump` backups), the `Caddyfile`, and `bootstrap.sh`, which prepares a fresh Ubuntu server once (security updates, Docker, firewall, fail2ban, SSH keys only once a key login works, a `deploy` user and a server-only `.env` with generated secrets).
 
 `.github/workflows/deploy.yml` runs after CI passes on `main`: it builds both images, pushes them to `ghcr.io/round24consult/yaropay-{api,web}` and restarts the stack over SSH. It stays off until the repository variable `DEPLOY_HOST` is set. Run it by hand with a commit SHA to roll back.
 
