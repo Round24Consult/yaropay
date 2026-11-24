@@ -266,6 +266,7 @@ function CreateTokenDialog({ info, open, onOpenChange, onCreated }: { info: McpI
   const [name, setName] = React.useState("")
   const [days, setDays] = React.useState("30")
   const [live, setLive] = React.useState(false)
+  const [actions, setActions] = React.useState(false)
   const [needsReauth, setNeedsReauth] = React.useState(false)
   const [password, setPassword] = React.useState("")
   const [code, setCode] = React.useState("")
@@ -277,6 +278,7 @@ function CreateTokenDialog({ info, open, onOpenChange, onCreated }: { info: McpI
       setName("")
       setDays("30")
       setLive(false)
+      setActions(false)
       setNeedsReauth(false)
       setPassword("")
       setCode("")
@@ -290,7 +292,7 @@ function CreateTokenDialog({ info, open, onOpenChange, onCreated }: { info: McpI
     setError(null)
     try {
       if (needsReauth) await reauth.mutateAsync({ password, code })
-      const created = await create.mutateAsync({ name: name.trim(), days: Number(days), live })
+      const created = await create.mutateAsync({ name: name.trim(), days: Number(days), live, actions: actions && info.settings.actionsAllowed })
       setOpen(false)
       onCreated(created)
     } catch (err) {
@@ -330,6 +332,17 @@ function CreateTokenDialog({ info, open, onOpenChange, onCreated }: { info: McpI
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox id="mcp-token-actions" checked={actions} onCheckedChange={(v) => setActions(v === true)} disabled={!info.settings.actionsAllowed} />
+            <div>
+              <FieldLabel htmlFor="mcp-token-actions">Actions with approval</FieldLabel>
+              <FieldDescription>
+                {info.settings.actionsAllowed
+                  ? "Re-check payments, retry webhooks, create payment links. Each one waits for your approval in YaroPay."
+                  : "This company doesn't let AI apps ask for actions."}
+              </FieldDescription>
+            </div>
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="mcp-token-live" checked={live} onCheckedChange={(v) => setLive(v === true)} disabled={!info.liveAvailable} />
@@ -376,7 +389,7 @@ function ControlsPanel({ info }: { info: McpInfo }) {
   const s = info.settings
   const set = (input: Parameters<typeof update.mutate>[0], done: string) =>
     update.mutate(input, { onSuccess: () => toast.success(done), onError: (e) => toast.error(e.message) })
-  const rows: { key: "enabled" | "liveAllowed" | "shareCustomerDetails"; title: string; description: string; on: string; off: string }[] = [
+  const rows: { key: "enabled" | "liveAllowed" | "actionsAllowed" | "shareCustomerDetails"; title: string; description: string; on: string; off: string }[] = [
     { key: "enabled", title: "AI apps", description: "Let members connect AI apps to this company.", on: "AI apps turned on", off: "AI apps turned off" },
     {
       key: "liveAllowed",
@@ -384,6 +397,13 @@ function ControlsPanel({ info }: { info: McpInfo }) {
       description: "Let members give an AI app live payments too (they need two-step sign-in). Turning this off takes live away from every connection.",
       on: "Live data allowed",
       off: "AI apps keep to test data",
+    },
+    {
+      key: "actionsAllowed",
+      title: "Actions",
+      description: "Let AI apps ask to re-check a payment, retry a webhook or create a payment link. Each one waits for the member's approval in YaroPay.",
+      on: "Actions allowed",
+      off: "AI apps can only read",
     },
     {
       key: "shareCustomerDetails",

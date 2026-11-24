@@ -889,3 +889,41 @@ export const oauthCodes = pgTable(
 
 export type OauthClientRow = typeof oauthClients.$inferSelect
 export type OauthAuthorizationRequestRow = typeof oauthAuthorizationRequests.$inferSelect
+
+/**
+ * An action an AI app asked for (re-check a payment, retry a webhook, create a payment link), waiting
+ * for its member to approve it in YaroPay. The stored arguments are what runs, never anything the app
+ * sends later. Results are kept a day so the app can fetch them.
+ */
+export const mcpApprovals = pgTable(
+  "mcp_approvals",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: workspaceId(),
+    connectionId: text("connection_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tool: text("tool").notNull(),
+    mode: text("mode").notNull(),
+    args: jsonb("args").notNull(),
+    argsHash: text("args_hash").notNull(),
+    /** What the approval page shows, worked out when the app asked. */
+    summary: jsonb("summary").notNull(),
+    /** `pending`, `executing`, `succeeded`, `failed`, `denied` or `expired`. */
+    status: text("status").notNull().default("pending"),
+    createdAt: createdAt(),
+    expiresAt: ts("expires_at").notNull(),
+    decidedAt: ts("decided_at"),
+    decidedIp: text("decided_ip"),
+    result: jsonb("result"),
+    error: text("error"),
+  },
+  (t) => [
+    index("mcp_approvals_connection_idx").on(t.connectionId, t.status),
+    index("mcp_approvals_user_created_idx").on(t.userId, t.createdAt),
+    foreignKey({ name: "mcp_approvals_connection_fk", columns: [t.workspaceId, t.connectionId], foreignColumns: [mcpConnections.workspaceId, mcpConnections.id] }).onDelete("cascade"),
+  ],
+)
+
+export type McpApprovalRow = typeof mcpApprovals.$inferSelect

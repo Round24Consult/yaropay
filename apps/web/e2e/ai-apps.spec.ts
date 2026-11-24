@@ -116,3 +116,38 @@ test("on Cloud, an AI app signs in: the member approves in YaroPay and the app g
   await expect(page.getByTestId("mcp-connection").filter({ hasText: "Claude Code" })).toBeVisible()
   await shot(page, "ai-apps-with-oauth")
 })
+
+test("on Cloud, an AI app asks to retry a webhook and the member approves it in YaroPay", async ({ page }) => {
+  test.skip(edition !== "cloud", "YaroPay Cloud only (E2E_EDITION=cloud)")
+  await ensurePlan(page)
+  await page.getByTestId("mcp-new-token").click()
+  await page.getByLabel("Name").fill("Claude Code actions")
+  await page.getByLabel("Actions with approval").check()
+  await page.getByTestId("mcp-create-token").click()
+  const token = (await page.getByTestId("mcp-created-token").textContent())!.trim()
+  await page.getByRole("button", { name: "Done" }).click()
+
+  const tool = async (name: string, args: Record<string, unknown>) => {
+    const res = await page.request.post("/mcp", {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json, text/event-stream", "content-type": "application/json", "mcp-protocol-version": "2025-11-25" },
+      data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
+    })
+    return JSON.parse((await res.text()).split("\n").find((l) => l.startsWith("data: "))!.slice(6)).result
+  }
+  // A sample test-mode delivery; the sample products' webhooks go to the local test receiver.
+  const list = await tool("list_webhook_deliveries", { since_days: 0, page_size: 1 })
+  const deliveryId = list.structuredContent.deliveries[0].id as string
+  const asked = await tool("retry_webhook_delivery", { delivery_id: deliveryId })
+  expect(asked.structuredContent.status).toBe("approval_required")
+
+  await page.goto(new URL(asked.structuredContent.approval_url).pathname)
+  await expect(page.getByTestId("approval")).toContainText("retry a webhook delivery")
+  await expect(page.getByTestId("approval-mode")).toHaveText("TEST")
+  await shot(page, "approval-pending")
+  await page.getByTestId("approval-approve").click()
+  await expect(page.getByTestId("approval-result")).toContainText("Delivered")
+  await shot(page, "approval-done")
+
+  const done = await tool("retry_webhook_delivery", { delivery_id: deliveryId, approval_id: asked.structuredContent.approval_id })
+  expect(done.structuredContent).toMatchObject({ status: "succeeded", result: { state: "delivered" } })
+})
