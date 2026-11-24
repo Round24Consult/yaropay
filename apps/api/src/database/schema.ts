@@ -715,3 +715,110 @@ export const billingCharges = pgTable(
 )
 
 export type BillingChargeRow = typeof billingCharges.$inferSelect
+
+// ---- AI apps (MCP) -----------------------------------------------------------------------------------
+// Paid feature `mcp`. The tables live here like every other paid table, so there is one migration history.
+
+/** What a company lets AI apps do (Settings → AI apps). No row means the defaults below. */
+export const mcpSettings = pgTable("mcp_settings", {
+  workspaceId: workspaceId().primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  allowedRoles: text("allowed_roles").array().notNull().default(sql`ARRAY['owner','admin','developer','finance','viewer']::text[]`),
+  liveAllowed: boolean("live_allowed").notNull().default(false),
+  actionsAllowed: boolean("actions_allowed").notNull().default(true),
+  /** Off: customer emails are masked and names cut to initials in what AI apps receive. */
+  shareCustomerDetails: boolean("share_customer_details").notNull().default(false),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+  updatedById: text("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+})
+
+/**
+ * One AI app a member connected (an OAuth sign-in) or one personal access token they created. Tokens
+ * hang off it, so revoking the connection ends every token at once.
+ */
+export const mcpConnections = pgTable(
+  "mcp_connections",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: workspaceId(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `oauth` or `token`. */
+    kind: text("kind").notNull(),
+    /** The OAuth client; null for personal tokens. */
+    clientId: text("client_id"),
+    /** The app's name when it connected, or the token's label. */
+    name: text("name").notNull(),
+    /** `mcp:read`, and `mcp:actions` when actions were allowed. */
+    scopes: text("scopes").array().notNull(),
+    liveAllowed: boolean("live_allowed").notNull().default(false),
+    liveAllowedAt: ts("live_allowed_at"),
+    /** Reserved for narrowing products when connecting; null means the member's own products. */
+    productIds: text("product_ids").array(),
+    /** The MCP server URL the tokens are for (RFC 8707). */
+    resource: text("resource").notNull(),
+    /** `ypmcp_pat_••••abcd` for personal tokens. */
+    tokenPreview: text("token_preview"),
+    createdAt: createdAt(),
+    expiresAt: ts("expires_at"),
+    lastUsedAt: ts("last_used_at"),
+    lastUsedIp: text("last_used_ip"),
+    revokedAt: ts("revoked_at"),
+    revokedById: text("revoked_by_id").references(() => users.id, { onDelete: "set null" }),
+    revokeReason: text("revoke_reason"),
+  },
+  (t) => [uniqueIndex("mcp_connections_workspace_id_key").on(t.workspaceId, t.id), index("mcp_connections_user_idx").on(t.userId)],
+)
+
+/** Access, refresh and personal tokens, stored as sha256 hashes like sessions and API keys. */
+export const mcpTokens = pgTable(
+  "mcp_tokens",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: workspaceId(),
+    connectionId: text("connection_id").notNull(),
+    /** `access`, `refresh` or `personal`. */
+    kind: text("kind").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    /** Refresh tokens: every rotation of one sign-in shares a family, so a stolen one ends them all. */
+    familyId: text("family_id"),
+    parentId: text("parent_id"),
+    createdAt: createdAt(),
+    expiresAt: ts("expires_at").notNull(),
+    usedAt: ts("used_at"),
+    revokedAt: ts("revoked_at"),
+  },
+  (t) => [
+    uniqueIndex("mcp_tokens_token_hash_key").on(t.tokenHash),
+    index("mcp_tokens_connection_idx").on(t.connectionId),
+    // The database refuses to hang one company's token off another company's connection.
+    foreignKey({ name: "mcp_tokens_connection_fk", columns: [t.workspaceId, t.connectionId], foreignColumns: [mcpConnections.workspaceId, mcpConnections.id] }).onDelete("cascade"),
+  ],
+)
+
+/** Every tool call an AI app made, kept 90 days (Settings → AI apps → Activity). IDs only, no customer data. */
+export const mcpToolCalls = pgTable(
+  "mcp_tool_calls",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: workspaceId(),
+    connectionId: text("connection_id"),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    clientName: text("client_name").notNull(),
+    tool: text("tool").notNull(),
+    mode: text("mode"),
+    /** `ok`, `error`, `denied`, `approval_required` or `rate_limited`. */
+    outcome: text("outcome").notNull(),
+    errorCode: text("error_code"),
+    approvalId: text("approval_id"),
+    durationMs: integer("duration_ms").notNull().default(0),
+    ip: text("ip"),
+    at: ts("at").notNull().defaultNow(),
+  },
+  (t) => [index("mcp_tool_calls_workspace_at_idx").on(t.workspaceId, t.at), index("mcp_tool_calls_connection_at_idx").on(t.connectionId, t.at)],
+)
+
+export type McpConnectionRow = typeof mcpConnections.$inferSelect
+export type McpTokenRow = typeof mcpTokens.$inferSelect
+export type McpSettingsRow = typeof mcpSettings.$inferSelect

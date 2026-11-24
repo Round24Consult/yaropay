@@ -15,6 +15,7 @@ import { AuthService, type ClientMeta, describeAgent } from "./auth.service.js"
 import { verifyPassword } from "./password.js"
 import { generateRecoveryCodes, generateTotpSecret, normaliseRecoveryCode, otpauthUri, verifyTotp } from "./totp.js"
 import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
+import { disconnectAiApps } from "./ai-connections.js"
 import type { Actor, SessionContext } from "./types.js"
 import { OperatorSettingsService } from "../settings/operator-settings.service.js"
 
@@ -118,6 +119,7 @@ export class MfaService {
       .where(eq(users.id, u.id))
     await this.db.update(sessions).set({ assurance: "password" }).where(and(eq(sessions.userId, u.id), eq(sessions.assurance, "mfa")))
     await forgetTrustedBrowsers(this.db, u.id)
+    await disconnectAiApps(this.db, u.id, "two_step_off")
     await this.recordEverywhere(u, "Turned off two-step sign-in", meta)
     await this.auth.sendMail(u.email, "Two-step sign-in is off", [
       `Signing in to ${u.email} needs only your password again.`,

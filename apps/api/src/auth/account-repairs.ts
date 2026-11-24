@@ -3,6 +3,7 @@ import { newId } from "../common/crypto.js"
 import type { Db } from "../database/db.js"
 import { auditLog, sessions, users, workspaceMembers } from "../database/schema.js"
 import { forgetTrustedBrowsers } from "./trusted-browsers.js"
+import { disconnectAiApps } from "./ai-connections.js"
 
 export type ResetTwoStepResult = { kind: "no_account" } | { kind: "already_off"; email: string } | { kind: "reset"; email: string }
 
@@ -23,6 +24,7 @@ export async function resetTwoStep(db: Db, email: string, actorName = "Server op
       .where(eq(users.id, user.id))
     await tx.update(sessions).set({ revokedAt: now }).where(and(eq(sessions.userId, user.id), isNull(sessions.revokedAt)))
     await forgetTrustedBrowsers(tx, user.id)
+    await disconnectAiApps(tx, user.id, "two_step_reset")
     const memberships = await tx.select({ workspaceId: workspaceMembers.workspaceId }).from(workspaceMembers).where(eq(workspaceMembers.userId, user.id))
     for (const m of memberships) {
       await tx.insert(auditLog).values({

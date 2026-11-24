@@ -26,6 +26,7 @@ import { JobsService } from "../notifications/jobs.service.js"
 import { SettingsService } from "../settings/settings.service.js"
 import { WorkspacesService } from "../workspaces/workspaces.service.js"
 import { dummyHash, hashPassword, verifyPassword } from "./password.js"
+import { disconnectAiApps } from "./ai-connections.js"
 import { forgetTrustedBrowsers, TrustedBrowsersService } from "./trusted-browsers.js"
 import type { Actor, Assurance, SessionContext } from "./types.js"
 import { OperatorSettingsService } from "../settings/operator-settings.service.js"
@@ -421,6 +422,7 @@ export class AuthService {
       .set({ revokedAt: new Date() })
       .where(and(eq(sessions.userId, actor.id), ne(sessions.id, sessionId), isNull(sessions.revokedAt)))
     await forgetTrustedBrowsers(this.db, actor.id)
+    await disconnectAiApps(this.db, actor.id, "password_changed")
     await this.audit.record({ workspaceId: actor.workspaceId, actorId: actor.id, actorName: actor.name, ip: meta.ip }, "Changed password", actor.email)
     await this.sendMail(user.email, "Your password was changed", [
       `The password for ${user.email} was just changed. Other sessions were signed out, and trusted browsers will ask for your authenticator code again.`,
@@ -488,6 +490,7 @@ export class AuthService {
       await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, reset.userId))
       await tx.update(sessions).set({ revokedAt: now }).where(and(eq(sessions.userId, reset.userId), isNull(sessions.revokedAt)))
       await forgetTrustedBrowsers(tx, reset.userId)
+      await disconnectAiApps(tx, reset.userId, "password_reset")
     })
     const [user] = await this.db.select().from(users).where(eq(users.id, reset.userId))
     // The account belongs to every workspace the person is in: each one's audit log hears about it.
