@@ -7,6 +7,7 @@ import type {
   CreatedMcpToken,
   CreateMcpTokenInput,
   McpActivityEntry,
+  McpApproval,
   McpConnection,
   McpConsentInput,
   McpConsentRequest,
@@ -82,4 +83,16 @@ export function useApproveMcpConsent(id: string) {
 
 export function useDenyMcpConsent(id: string) {
   return useMutation({ mutationFn: () => api<McpConsentResult>(`/mcp/authorize/${encodeURIComponent(id)}/deny`, { method: "POST" }) })
+}
+
+export function useMcpApproval(id: string) {
+  return useQuery({ queryKey: ["mcp", "approval", id] as const, queryFn: () => api<McpApproval>(`/mcp/approvals/${encodeURIComponent(id)}`), retry: false })
+}
+
+export function useDecideMcpApproval(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (decision: "approve" | "deny") => api<McpApproval>(`/mcp/approvals/${encodeURIComponent(id)}/${decision}`, { method: "POST" }),
+    onSuccess: (data) => qc.setQueryData(["mcp", "approval", id], data),
+  })
 }

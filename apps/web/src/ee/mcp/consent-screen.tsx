@@ -62,6 +62,7 @@ function Consent({ request }: { request: McpConsentRequest }) {
   const firstAvailable = request.companies.find((c) => c.current && c.available) ?? request.companies.find((c) => c.available)
   const [companyId, setCompanyId] = React.useState(firstAvailable?.id ?? "")
   const [live, setLive] = React.useState(false)
+  const [actions, setActions] = React.useState(true)
   const [needsReauth, setNeedsReauth] = React.useState(false)
   const [password, setPassword] = React.useState("")
   const [code, setCode] = React.useState("")
@@ -75,7 +76,7 @@ function Consent({ request }: { request: McpConsentRequest }) {
     setError(null)
     try {
       if (needsReauth) await reauth.mutateAsync({ password, code })
-      const { redirectUrl } = await approve.mutateAsync({ workspaceId: companyId, live: live && !!company?.liveAvailable, actions: false })
+      const { redirectUrl } = await approve.mutateAsync({ workspaceId: companyId, live: live && !!company?.liveAvailable, actions: actions && !!company?.actionsAvailable })
       setLeaving(true)
       window.location.assign(redirectUrl)
     } catch (err) {
@@ -171,6 +172,18 @@ function Consent({ request }: { request: McpConsentRequest }) {
           </li>
         </ul>
       </div>
+
+      {company?.actionsAvailable && (
+        <div className="flex items-start gap-3 rounded-lg border p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Ask for actions</p>
+            <p className="text-xs text-muted-foreground">
+              Re-check a payment, retry a webhook or create a payment link. Each one waits for you to approve it in YaroPay.
+            </p>
+          </div>
+          <Switch checked={actions} onCheckedChange={setActions} disabled={busy} aria-label="Ask for actions" data-testid="consent-actions" />
+        </div>
+      )}
 
       <div className="flex items-start gap-3 rounded-lg border p-3">
         <div className="min-w-0 flex-1">

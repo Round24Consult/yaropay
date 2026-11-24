@@ -90,6 +90,8 @@ export const createMcpTokenSchema = z.object({
   days: z.number().int().min(1).max(MCP_TOKEN_MAX_DAYS, `Tokens last at most ${MCP_TOKEN_MAX_DAYS} days`),
   /** Live data as well as test data. Needs two-step sign-in and a recent sign-in. */
   live: z.boolean().default(false),
+  /** Let the app ask for actions; each one still waits for approval in YaroPay. */
+  actions: z.boolean().default(false),
 })
 
 export type CreateMcpTokenInput = z.infer<typeof createMcpTokenSchema>
@@ -143,6 +145,8 @@ export interface McpConsentCompany {
   reason: string | null
   /** The company allows live data and this member has two-step sign-in on. */
   liveAvailable: boolean
+  /** The company allows actions and this member's role may do at least one of them. */
+  actionsAvailable: boolean
 }
 
 /** What the consent page shows: which app is asking, where it sends you back, and where it may connect. */
@@ -177,4 +181,37 @@ export type McpConsentInput = z.infer<typeof mcpConsentSchema>
 /** Where the browser goes next: back to the AI app, with a code or an error. */
 export interface McpConsentResult {
   redirectUrl: string
+}
+
+/** The actions AI apps may ask for. Each one waits for its member's approval in YaroPay. */
+export const MCP_ACTIONS = {
+  recheck_payment: { title: "Re-check a payment with the gateway", permission: "transactions:verify" },
+  retry_webhook_delivery: { title: "Retry a webhook delivery", permission: "webhooks:replay" },
+  create_payment_link: { title: "Create a payment link", permission: "transactions:create" },
+} as const
+
+export type McpActionTool = keyof typeof MCP_ACTIONS
+
+/** How long an action waits for approval. */
+export const MCP_APPROVAL_MINUTES = 15
+
+export type McpApprovalStatus = "pending" | "executing" | "succeeded" | "failed" | "denied" | "expired"
+
+/** An action waiting for (or past) its member's approval: what the approval page shows. */
+export interface McpApproval {
+  id: string
+  tool: McpActionTool
+  title: string
+  mode: Mode
+  /** What will happen, line by line, worked out when the app asked. */
+  details: { label: string; value: string }[]
+  client: string
+  company: string
+  status: McpApprovalStatus
+  createdAt: string
+  expiresAt: string
+  decidedAt: string | null
+  /** After it ran: a sentence, and a link to copy when there is one (a checkout). */
+  result: { summary: string; link: string | null } | null
+  error: string | null
 }

@@ -50,7 +50,7 @@ export async function createTestApp(env: Record<string, string> = {}, opts: { ex
   if (PG_URL) {
     await app.get<Db>(DB).execute(
       sql.raw(
-        "truncate workspaces, workspace_members, settings, users, sessions, trusted_browsers, invites, password_resets, email_verifications, connections, products, product_gateways, transactions, webhook_events, webhook_deliveries, audit_log, notifications, notification_preferences, jobs, licences, billing_plans, billing_prices, exchange_rates, platform_audit_log, invoices, billing_payment_methods, billing_charges, mcp_settings, mcp_connections, mcp_tokens, mcp_tool_calls, oauth_clients, oauth_authorization_requests, oauth_codes cascade",
+        "truncate workspaces, workspace_members, settings, users, sessions, trusted_browsers, invites, password_resets, email_verifications, connections, products, product_gateways, transactions, webhook_events, webhook_deliveries, audit_log, notifications, notification_preferences, jobs, licences, billing_plans, billing_prices, exchange_rates, platform_audit_log, invoices, billing_payment_methods, billing_charges, mcp_settings, mcp_connections, mcp_tokens, mcp_tool_calls, oauth_clients, oauth_authorization_requests, oauth_codes, mcp_approvals cascade",
       ),
     )
     // Put back what migration 0007 seeds: the Standard plan and its first price.
