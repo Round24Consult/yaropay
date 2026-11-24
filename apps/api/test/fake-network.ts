@@ -53,6 +53,8 @@ export class FakeNetwork {
   readonly paypalOrders = new Map<string, FakePayPalOrder>()
   /** Hosts that never answer, like a hung server: a request waits until the caller's timeout gives up. */
   readonly silentHosts = new Set<string>()
+  /** JSON documents served at exact addresses (an AI app's client ID metadata document, for one). */
+  readonly documents = new Map<string, { status?: number; body: unknown; headers?: Record<string, string> }>()
   private nextOrder = 1
 
   fetch = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
@@ -66,6 +68,8 @@ export class FakeNetwork {
     this.requests.push({ url: url.href, method, headers, body })
     if (this.silentHosts.has(url.host)) return never(init.signal)
 
+    const doc = this.documents.get(url.href)
+    if (doc) return new Response(JSON.stringify(doc.body), { status: doc.status ?? 200, headers: { "content-type": "application/json", ...doc.headers } })
     if (url.host === "api.paystack.test") return this.paystack(url, method, headers, body)
     if (url.host === "api.flutterwave.test") return this.flutterwave(url, method, headers, body)
     if (url.host === "api.paypal.test") return this.paypal(url, method, headers, body)

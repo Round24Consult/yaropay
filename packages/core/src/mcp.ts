@@ -55,7 +55,17 @@ export const mcpSettingsSchema = z
 export type McpSettingsInput = z.infer<typeof mcpSettingsSchema>
 
 /** Why a connection ended, when it was ended for the member rather than by them. */
-export type McpRevokeReason = "revoked" | "password_changed" | "password_reset" | "two_step_off" | "two_step_reset" | "account_disabled" | "expired"
+export type McpRevokeReason =
+  | "revoked"
+  | "revoked_by_app"
+  | "refresh_reused"
+  | "code_reused"
+  | "password_changed"
+  | "password_reset"
+  | "two_step_off"
+  | "two_step_reset"
+  | "account_disabled"
+  | "expired"
 
 /** One connected AI app or personal access token. */
 export interface McpConnection {
@@ -116,4 +126,55 @@ export interface McpActivityEntry {
   connectionName: string
   userName: string | null
   durationMs: number
+}
+
+/** How long OAuth tokens last. A connection made by signing in lasts 90 days, then the app asks again. */
+export const MCP_OAUTH = { accessTokenSeconds: 3600, refreshTokenDays: 30, connectionDays: 90 } as const
+
+/** A company the member could connect an AI app to, on the consent page. */
+export interface McpConsentCompany {
+  id: string
+  name: string
+  role: Role
+  /** The company the dashboard is showing now. */
+  current: boolean
+  available: boolean
+  /** Why AI apps can't be used there. Null when they can. */
+  reason: string | null
+  /** The company allows live data and this member has two-step sign-in on. */
+  liveAvailable: boolean
+}
+
+/** What the consent page shows: which app is asking, where it sends you back, and where it may connect. */
+export interface McpConsentRequest {
+  id: string
+  client: {
+    name: string
+    /** The client ID metadata document's address, or a registered id. */
+    clientId: string
+    /** `cimd`: the app published its details at an https address; `dcr`: it registered itself here. */
+    kind: "cimd" | "dcr"
+    /** The host the app's details came from (CIMD), the only part YaroPay can vouch for. */
+    host: string | null
+    uri: string | null
+    logoUri: string | null
+  }
+  /** Where approving sends you: a website's host, or "an app on this computer". */
+  redirect: { host: string; local: boolean; customScheme: boolean }
+  companies: McpConsentCompany[]
+  mfaEnabled: boolean
+  expiresAt: string
+}
+
+export const mcpConsentSchema = z.object({
+  workspaceId: z.string().min(1).max(64),
+  live: z.boolean().default(false),
+  actions: z.boolean().default(false),
+})
+
+export type McpConsentInput = z.infer<typeof mcpConsentSchema>
+
+/** Where the browser goes next: back to the AI app, with a code or an error. */
+export interface McpConsentResult {
+  redirectUrl: string
 }

@@ -822,3 +822,70 @@ export const mcpToolCalls = pgTable(
 export type McpConnectionRow = typeof mcpConnections.$inferSelect
 export type McpTokenRow = typeof mcpTokens.$inferSelect
 export type McpSettingsRow = typeof mcpSettings.$inferSelect
+
+// ---- AI app sign-in (OAuth 2.1 for MCP) ------------------------------------------------------------------
+
+/**
+ * AI apps that may ask members to connect, install-wide (a client isn't any one company's). Either a
+ * client ID metadata document (`client_id` is its https URL, fetched and cached) or registered through
+ * dynamic client registration (`client_id` is `ocl_…`). Only public clients: no secrets.
+ */
+export const oauthClients = pgTable(
+  "oauth_clients",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id").notNull(),
+    /** `cimd` or `dcr`. */
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    clientUri: text("client_uri"),
+    logoUri: text("logo_uri"),
+    redirectUris: text("redirect_uris").array().notNull(),
+    /** The whole document or registration, as received. */
+    metadata: jsonb("metadata").notNull().default({}),
+    registeredIp: text("registered_ip"),
+    createdAt: createdAt(),
+    /** CIMD: when the cached document must be fetched again. */
+    cacheExpiresAt: ts("cache_expires_at"),
+    lastUsedAt: ts("last_used_at"),
+    blockedAt: ts("blocked_at"),
+  },
+  (t) => [uniqueIndex("oauth_clients_client_id_key").on(t.clientId)],
+)
+
+/** A sign-in started by an AI app, waiting for the member to pick a company and approve. 10 minutes. */
+export const oauthAuthorizationRequests = pgTable("oauth_authorization_requests", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  state: text("state"),
+  codeChallenge: text("code_challenge").notNull(),
+  scopes: text("scopes").array().notNull(),
+  resource: text("resource").notNull(),
+  createdAt: createdAt(),
+  expiresAt: ts("expires_at").notNull(),
+  consumedAt: ts("consumed_at"),
+})
+
+/** One-time authorization codes, 60 seconds, stored as hashes. */
+export const oauthCodes = pgTable(
+  "oauth_codes",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    workspaceId: workspaceId(),
+    connectionId: text("connection_id").notNull(),
+    clientId: text("client_id").notNull(),
+    redirectUri: text("redirect_uri").notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    resource: text("resource").notNull(),
+    createdAt: createdAt(),
+    expiresAt: ts("expires_at").notNull(),
+    usedAt: ts("used_at"),
+  },
+  (t) => [
+    foreignKey({ name: "oauth_codes_connection_fk", columns: [t.workspaceId, t.connectionId], foreignColumns: [mcpConnections.workspaceId, mcpConnections.id] }).onDelete("cascade"),
+  ],
+)
+
+export type OauthClientRow = typeof oauthClients.$inferSelect
+export type OauthAuthorizationRequestRow = typeof oauthAuthorizationRequests.$inferSelect
