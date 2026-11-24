@@ -364,6 +364,20 @@ export class AuthService {
     return m
   }
 
+  /**
+   * The member as an actor in one workspace, for credentials that aren't a browser session (AI app
+   * connections). Null when the account is disabled, the membership is gone or turned off, or the
+   * workspace is suspended. Permissions go through the resolver, the same as for sessions, so a role
+   * change applies on the next request.
+   */
+  async memberActor(userId: string, workspaceId: string): Promise<Actor | null> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId))
+    if (!user || user.disabledAt) return null
+    const member = await this.activeMember(workspaceId, userId)
+    if (!member) return null
+    return toActor(user, member, await this.permissionsOf(userId, member))
+  }
+
   /** Moves this session to another workspace the member belongs to. */
   async switchWorkspace(actor: Actor, sessionId: string, workspaceId: string): Promise<SessionUser> {
     const member = await this.activeMember(workspaceId, actor.id)

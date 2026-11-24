@@ -11,6 +11,9 @@ export const PERMISSIONS = [
   "dashboard:read",
   "transactions:read",
   "transactions:export",
+  // Ask the gateway for a payment's status now, and start a payment. Used by AI apps (MCP) for now.
+  "transactions:verify",
+  "transactions:create",
   "products:read",
   "products:write",
   "products:delete",
@@ -41,8 +44,8 @@ const READ: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS,
-  developer: [...READ, "transactions:export", "products:write", "products:keys", "webhooks:replay", "audit:read"],
-  finance: [...READ, "transactions:export", "audit:read"],
+  developer: [...READ, "transactions:export", "transactions:verify", "transactions:create", "products:write", "products:keys", "webhooks:replay", "audit:read"],
+  finance: [...READ, "transactions:export", "transactions:verify", "transactions:create", "audit:read"],
   viewer: READ,
 }
 

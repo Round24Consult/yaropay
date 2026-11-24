@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { AuthService } from "../src/auth/auth.service.js"
 import { addMember, createProduct, createTestApp, installGateway, setupOwner, type TestApp } from "./helpers.js"
 
 describe("team, roles and product scope", () => {
@@ -110,6 +111,27 @@ describe("team, roles and product scope", () => {
     const promoted = await owner.patch(`/api/team/${adminId}`).send({ role: "owner", productIds: [shop] }).expect(200)
     expect(promoted.body).toMatchObject({ role: "owner", productIds: null })
     await owner.patch(`/api/team/${adminId}`).send({ role: "viewer" }).expect(200)
+  })
+
+  it("resolves a member outside a session, following role changes and removal", async () => {
+    const auth = t.app.get(AuthService)
+    const workspaceId = (await owner.get("/api/auth/me").expect(200)).body.user.workspace.id as string
+    await addMember(t, owner, { email: "dev@example.test", role: "developer", productIds: [shop] })
+    const team = (await owner.get("/api/team").expect(200)).body as { id: string; email: string }[]
+    const devId = team.find((m) => m.email === "dev@example.test")!.id
+
+    const dev = await auth.memberActor(devId, workspaceId)
+    expect(dev).toMatchObject({ id: devId, workspaceId, role: "developer", productIds: [shop] })
+    expect(dev!.permissions).toEqual(expect.arrayContaining(["transactions:verify", "transactions:create", "webhooks:replay"]))
+    expect(await auth.memberActor(devId, "wsp_someone_else")).toBeNull()
+
+    await owner.patch(`/api/team/${devId}`).send({ role: "viewer" }).expect(200)
+    const viewer = await auth.memberActor(devId, workspaceId)
+    expect(viewer!.role).toBe("viewer")
+    expect(viewer!.permissions).not.toContain("transactions:create")
+
+    await owner.delete(`/api/team/${devId}`).expect(200)
+    expect(await auth.memberActor(devId, workspaceId)).toBeNull()
   })
 
   it("removing a member ends their sessions", async () => {

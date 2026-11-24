@@ -4,7 +4,8 @@
 {$APP_DOMAIN} {
 	# The product API, gateway webhooks and checkout callbacks go straight to the API, so taking payments
 	# never depends on the dashboard container. Everything else (pages and /api) goes through the dashboard.
-	@payments path /v1/*
+	# AI apps (MCP) and their sign-in (OAuth) are API endpoints too; in Community they answer 404.
+	@payments path /v1/* /mcp /mcp/* /oauth/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/* /.well-known/oauth-authorization-server /.well-known/oauth-authorization-server/*
 	handle @payments {
 		reverse_proxy api:4000
 	}
