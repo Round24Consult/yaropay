@@ -135,7 +135,17 @@ export class PaymentsService {
     return pick.connection
   }
 
-  async create(product: ProductRow, mode: Mode, input: CreatePaymentInput, idempotencyKey: string | null): Promise<{ created: boolean; payment: PaymentResponse }> {
+  /**
+   * Starts a payment. `origin` replaces the first timeline step's text when someone other than the
+   * product server started it (an AI app, for one).
+   */
+  async create(
+    product: ProductRow,
+    mode: Mode,
+    input: CreatePaymentInput,
+    idempotencyKey: string | null,
+    origin?: { title: string; detail: string },
+  ): Promise<{ created: boolean; payment: PaymentResponse }> {
     if (product.status !== "active") throw conflict(`${product.name} is paused. Resume it in the dashboard to take payments.`)
     // A suspended company can't start new payments; ones already started still complete (webhooks,
     // callbacks and deliveries don't check this).
@@ -197,7 +207,11 @@ export class PaymentsService {
           customerName: input.name ?? "",
           metadata,
           idempotencyKey,
-          timeline: [step("initialized", `Initialised by ${product.name}`, `POST /v1/products/${product.id}/payments with reference ${reference}`, true)],
+          timeline: [
+            origin
+              ? step("initialized", origin.title, origin.detail, true)
+              : step("initialized", `Initialised by ${product.name}`, `POST /v1/products/${product.id}/payments with reference ${reference}`, true),
+          ],
         })
         .returning()
     } catch (e) {
@@ -256,10 +270,26 @@ export class PaymentsService {
       .where(and(eq(transactions.reference, reference), eq(transactions.productId, product.id), eq(transactions.mode, mode)))
     if (!row) throw notFound("Payment")
     if (!refresh || TERMINAL.includes(row.status as TransactionStatus)) return toPaymentResponse(row)
-    const verified = await this.verifyRow(row)
-    if (!verified) return toPaymentResponse(row)
-    const { row: next } = await this.settle(row.id, verified, [step("verified", "Status checked with the gateway", "Requested by the product server", verified.status === "success")], null)
+    const { row: next } = await this.recheck(row, "Requested by the product server")
     return toPaymentResponse(next)
+  }
+
+  /**
+   * Asks the gateway for the payment's status now and settles it, whatever its current status: the
+   * usual status rules decide whether it may move (a failed payment the customer paid after all
+   * becomes successful; a successful one never goes back to pending). `checked` is false when the
+   * payment's gateway account no longer exists. Gateway errors are thrown.
+   */
+  async recheck(row: TransactionRowDb, requestedBy: string): Promise<{ checked: boolean; changed: boolean; row: TransactionRowDb }> {
+    const verified = await this.verifyRow(row)
+    if (!verified) return { checked: false, changed: false, row }
+    const { changed, row: next } = await this.settle(
+      row.id,
+      verified,
+      [step("verified", "Status checked with the gateway", requestedBy, verified.status === "success")],
+      null,
+    )
+    return { checked: true, changed, row: next }
   }
 
   // ---- Settlement ------------------------------------------------------------

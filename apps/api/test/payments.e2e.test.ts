@@ -2,7 +2,8 @@ import { createHmac } from "node:crypto"
 import { parseSignatureHeader } from "@yaropay/core/payments"
 import { eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { connections, webhookDeliveries } from "../src/database/schema.js"
+import { connections, products, transactions, webhookDeliveries } from "../src/database/schema.js"
+import { PaymentsService } from "../src/payments/payments.service.js"
 import { createProduct, createTestApp, FLUTTERWAVE_TEST, installGateway, PAYSTACK_TEST, setupOwner, type TestApp } from "./helpers.js"
 
 const HOOK = "https://shop.example.test/hooks/yaropay"
@@ -247,6 +248,44 @@ describe("payments through Paystack", () => {
     const [event] = (await owner.get("/api/webhooks/events?mode=test").expect(200)).body.rows as { id: string; payload: unknown; signatureValid: boolean }[]
     expect(event.signatureValid).toBe(false)
     expect(event.payload).toEqual({ truncated: true, bytes: big.length })
+  })
+
+  it("re-checks a payment with the gateway on request, whatever its status", async () => {
+    const payments = t.app.get(PaymentsService)
+    const { reference } = (await start().expect(201)).body
+    const row = async () => (await t.db.select().from(transactions).where(eq(transactions.reference, reference)))[0]
+
+    t.net.setStatus(reference, "success")
+    const first = await payments.recheck(await row(), "Asked by Kemi via Claude")
+    expect(first).toMatchObject({ checked: true, changed: true })
+    expect(first.row.status).toBe("success")
+    expect(first.row.timeline.at(-1)).toMatchObject({ kind: "verified", title: "Status checked with the gateway", detail: "Asked by Kemi via Claude" })
+    expect(await t.deliveries.runDue()).toBe(1)
+    expect(JSON.parse(t.net.sentTo(HOOK)[0].body).type).toBe("payment.succeeded")
+
+    // Already settled: checked again, nothing moves and nothing new is sent.
+    const again = await payments.recheck(await row(), "Asked again")
+    expect(again).toMatchObject({ checked: true, changed: false })
+    expect(await t.deliveries.runDue()).toBe(0)
+
+    // A payment marked abandoned that the customer paid after all becomes successful.
+    const late = (await start().expect(201)).body.reference as string
+    await t.db.update(transactions).set({ status: "abandoned" }).where(eq(transactions.reference, late))
+    t.net.setStatus(late, "success")
+    const [abandoned] = await t.db.select().from(transactions).where(eq(transactions.reference, late))
+    expect((await payments.recheck(abandoned, "Asked by Kemi via Claude")).row.status).toBe("success")
+  })
+
+  it("names who started a payment when it isn't the product server", async () => {
+    const [row] = await t.db.select().from(products).where(eq(products.id, product.product.id))
+    const { payment } = await t.app
+      .get(PaymentsService)
+      .create(row, "test", { amount: 250_000, currency: "NGN", email: "ada@example.test" }, "mcp_test_1", { title: "Created by Ada via Claude", detail: "Approved in YaroPay" })
+    const detail = (await owner.get(`/api/transactions/${payment.reference}`).expect(200)).body
+    expect(detail.timeline[0]).toMatchObject({ kind: "initialized", title: "Created by Ada via Claude", detail: "Approved in YaroPay" })
+    // The product server's own payments keep the usual first step.
+    const own = (await start().expect(201)).body.reference
+    expect((await owner.get(`/api/transactions/${own}`).expect(200)).body.timeline[0].title).toBe(`Initialised by ${row.name}`)
   })
 
   it("refuses to mark an underpaid payment as successful", async () => {

@@ -36,6 +36,27 @@ const nextConfig: NextConfig = {
       // Public endpoints (gateway webhooks, callbacks, product payments API), so the
       // dashboard origin can also serve as the install's base URL in development.
       { source: "/v1/:path*", destination: `${apiUrl}/v1/:path*` },
+      // AI apps (MCP) and their sign-in (OAuth), for installs without a reverse proxy in front.
+      { source: "/mcp", destination: `${apiUrl}/mcp` },
+      { source: "/mcp/:path*", destination: `${apiUrl}/mcp/:path*` },
+      { source: "/oauth/:path*", destination: `${apiUrl}/oauth/:path*` },
+      { source: "/.well-known/oauth-protected-resource", destination: `${apiUrl}/.well-known/oauth-protected-resource` },
+      { source: "/.well-known/oauth-protected-resource/:path*", destination: `${apiUrl}/.well-known/oauth-protected-resource/:path*` },
+      { source: "/.well-known/oauth-authorization-server", destination: `${apiUrl}/.well-known/oauth-authorization-server` },
+      { source: "/.well-known/oauth-authorization-server/:path*", destination: `${apiUrl}/.well-known/oauth-authorization-server/:path*` },
+    ]
+  },
+  async headers() {
+    // The pages where someone approves an AI app or one of its actions must never load inside
+    // another site's frame, or a click there could be tricked into an approval.
+    return [
+      {
+        source: "/connect/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
     ]
   },
 }
