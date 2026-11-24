@@ -285,7 +285,7 @@ describe("payments through Paystack", () => {
     expect(detail.timeline[0]).toMatchObject({ kind: "initialized", title: "Created by Ada via Claude", detail: "Approved in YaroPay" })
     // The product server's own payments keep the usual first step.
     const own = (await start().expect(201)).body.reference
-    expect((await owner.get(`/api/transactions/${own}`).expect(200)).body.timeline[0].title).toBe(`Initialised by ${product.product.name}`)
+    expect((await owner.get(`/api/transactions/${own}`).expect(200)).body.timeline[0].title).toBe(`Initialised by ${row.name}`)
   })
 
   it("refuses to mark an underpaid payment as successful", async () => {
