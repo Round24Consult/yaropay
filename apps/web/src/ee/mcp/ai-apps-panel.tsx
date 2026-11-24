@@ -110,12 +110,40 @@ function Snippets({ url, token }: { url: string; token: string }) {
   )
 }
 
+/** Apps that sign in by themselves: paste the URL, approve in YaroPay, done. */
+function SignInSteps({ url }: { url: string }) {
+  const steps: { app: string; how: React.ReactNode }[] = [
+    { app: "Claude (web and desktop)", how: "Settings → Connectors → Add custom connector, then paste the URL." },
+    { app: "ChatGPT", how: "Settings → Apps & Connectors → Create (developer mode), then paste the URL." },
+    {
+      app: "Claude Code",
+      how: (
+        <>
+          <code className="rounded bg-muted px-1 font-mono text-xs">claude mcp add --transport http yaropay {url}</code>, then run{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">/mcp</code> to sign in.
+        </>
+      ),
+    },
+    { app: "Cursor and VS Code", how: "Add an MCP server with just the URL; they open YaroPay to sign in." },
+  ]
+  return (
+    <ul className="divide-y rounded-lg border text-sm" data-testid="mcp-sign-in-steps">
+      {steps.map((s) => (
+        <li key={s.app} className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:gap-3">
+          <span className="w-48 shrink-0 font-medium">{s.app}</span>
+          <span className="min-w-0 text-muted-foreground">{s.how}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function ConnectPanel({ info }: { info: McpInfo }) {
   return (
     <Panel>
       <PanelHeader
         title="AI apps (MCP)"
-        description="Connect Claude, Cursor, VS Code and other AI apps to this company. They see what you may see, in test mode unless you allow live data, with customer details masked unless an admin shares them."
+        description="Connect Claude, ChatGPT, Cursor, VS Code and other AI apps to this company. They see what you may see, in test mode unless you allow live data, with customer details masked unless an admin shares them."
         actions={
           <Button variant="outline" size="sm" asChild>
             <a href={DOCS_URL} target="_blank" rel="noreferrer">
@@ -132,8 +160,15 @@ function ConnectPanel({ info }: { info: McpInfo }) {
             <AlertDescription>{info.reason}</AlertDescription>
           </Alert>
         )}
-        <CopyField label="MCP server URL" value={info.url} testId="mcp-url" hint="Create a token below, then add YaroPay to your AI app with it." />
-        <Snippets url={info.url} token="<your token>" />
+        <CopyField label="MCP server URL" value={info.url} testId="mcp-url" hint="Add this URL to your AI app. It opens YaroPay so you can choose the company and approve." />
+        <SignInSteps url={info.url} />
+        <details className="group rounded-lg border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Apps without sign-in: use a token</summary>
+          <div className="mt-3 space-y-3">
+            <p className="text-sm text-muted-foreground">Create a token below, then add YaroPay with it:</p>
+            <Snippets url={info.url} token="<your token>" />
+          </div>
+        </details>
       </div>
     </Panel>
   )
@@ -148,7 +183,7 @@ function ConnectionsPanel({ info }: { info: McpInfo }) {
     <Panel className="overflow-hidden" data-testid="mcp-connections">
       <PanelHeader
         title={info.canManage ? "Connected AI apps and tokens" : "Your AI app tokens"}
-        description="Each token works for one member in this company. Revoke one and the app loses access at once. Changing your password or two-step sign-in revokes all of yours."
+        description="Each connection works for one member in this company. Revoke one and the app loses access at once. Changing your password or two-step sign-in ends all of yours."
         actions={
           <Button size="sm" onClick={() => setCreating(true)} disabled={!info.available} data-testid="mcp-new-token">
             <Plus /> New token

@@ -3,7 +3,18 @@
 // YaroPay Enterprise License: see LICENSE.md in the ee folder.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { CreatedMcpToken, CreateMcpTokenInput, McpActivityEntry, McpConnection, McpInfo, McpSettings, McpSettingsInput } from "@yaropay/core/mcp"
+import type {
+  CreatedMcpToken,
+  CreateMcpTokenInput,
+  McpActivityEntry,
+  McpConnection,
+  McpConsentInput,
+  McpConsentRequest,
+  McpConsentResult,
+  McpInfo,
+  McpSettings,
+  McpSettingsInput,
+} from "@yaropay/core/mcp"
 import { api } from "@/lib/api/client"
 
 const qk = {
@@ -53,4 +64,22 @@ export function useUpdateMcpSettings() {
       qc.invalidateQueries({ queryKey: qk.connections })
     },
   })
+}
+
+export function useMcpConsent(id: string | null) {
+  return useQuery({
+    queryKey: ["mcp", "consent", id] as const,
+    queryFn: () => api<McpConsentRequest>(`/mcp/authorize/${encodeURIComponent(id!)}`),
+    enabled: !!id,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useApproveMcpConsent(id: string) {
+  return useMutation({ mutationFn: (input: McpConsentInput) => api<McpConsentResult>(`/mcp/authorize/${encodeURIComponent(id)}`, { method: "POST", json: input }) })
+}
+
+export function useDenyMcpConsent(id: string) {
+  return useMutation({ mutationFn: () => api<McpConsentResult>(`/mcp/authorize/${encodeURIComponent(id)}/deny`, { method: "POST" }) })
 }
