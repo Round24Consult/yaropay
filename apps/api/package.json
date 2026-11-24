@@ -1,6 +1,6 @@
 {
   "name": "@yaropay/api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "YaroPay API: NestJS backend for multi-product payment orchestration",
   "license": "AGPL-3.0-only",
