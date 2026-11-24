@@ -1,0 +1,56 @@
+"use client"
+
+// YaroPay Enterprise License: see LICENSE.md in the ee folder.
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { CreatedMcpToken, CreateMcpTokenInput, McpActivityEntry, McpConnection, McpInfo, McpSettings, McpSettingsInput } from "@yaropay/core/mcp"
+import { api } from "@/lib/api/client"
+
+const qk = {
+  info: ["mcp", "info"] as const,
+  connections: ["mcp", "connections"] as const,
+  activity: (page: number) => ["mcp", "activity", page] as const,
+}
+
+export function useMcpInfo(enabled = true) {
+  return useQuery({ queryKey: qk.info, queryFn: () => api<McpInfo>("/mcp/info"), enabled })
+}
+
+export function useMcpConnections(enabled = true) {
+  return useQuery({ queryKey: qk.connections, queryFn: () => api<McpConnection[]>("/mcp/connections"), enabled })
+}
+
+export function useMcpActivity(page: number, enabled = true) {
+  return useQuery({
+    queryKey: qk.activity(page),
+    queryFn: () => api<{ rows: McpActivityEntry[]; page: number; more: boolean }>("/mcp/activity", { params: { page } }),
+    enabled,
+  })
+}
+
+export function useCreateMcpToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateMcpTokenInput) => api<CreatedMcpToken>("/mcp/tokens", { method: "POST", json: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.connections }),
+  })
+}
+
+export function useRevokeMcpConnection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<{ ok: true }>(`/mcp/connections/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.connections }),
+  })
+}
+
+export function useUpdateMcpSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: McpSettingsInput) => api<McpSettings>("/mcp/settings", { method: "PUT", json: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.info })
+      qc.invalidateQueries({ queryKey: qk.connections })
+    },
+  })
+}

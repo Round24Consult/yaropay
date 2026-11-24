@@ -120,6 +120,13 @@
       "when": 1794932018890,
       "tag": "0016_gateway_availability",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795558167218,
+      "tag": "0017_mcp",
+      "breakpoints": true
     }
   ]
 }

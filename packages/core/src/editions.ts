@@ -18,6 +18,7 @@ export const FEATURES = [
   "reconciliation",
   "scheduled_reports",
   "priority_support",
+  "mcp",
 ] as const
 
 export type Feature = (typeof FEATURES)[number]
@@ -44,6 +45,7 @@ export const FEATURE_INFO: Record<Feature, { label: string; description: string 
   reconciliation: { label: "Settlement reconciliation", description: "Match gateway settlements against payments and spot what is missing." },
   scheduled_reports: { label: "Scheduled reports", description: "Email payment reports to finance on a schedule." },
   priority_support: { label: "Priority support", description: "Answers from the team that builds YaroPay, with agreed response times." },
+  mcp: { label: "AI assistants (MCP)", description: "Connect Claude, ChatGPT, Cursor and other AI apps to ask about payments and run approved actions." },
 }
 
 /** How long paid features keep working after a licence expires. */

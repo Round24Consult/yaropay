@@ -50,13 +50,20 @@ export async function createTestApp(env: Record<string, string> = {}, opts: { ex
   if (PG_URL) {
     await app.get<Db>(DB).execute(
       sql.raw(
-        "truncate workspaces, workspace_members, settings, users, sessions, trusted_browsers, invites, password_resets, email_verifications, connections, products, product_gateways, transactions, webhook_events, webhook_deliveries, audit_log, notifications, notification_preferences, jobs, licences, billing_plans, billing_prices, exchange_rates, platform_audit_log, invoices, billing_payment_methods, billing_charges cascade",
+        "truncate workspaces, workspace_members, settings, users, sessions, trusted_browsers, invites, password_resets, email_verifications, connections, products, product_gateways, transactions, webhook_events, webhook_deliveries, audit_log, notifications, notification_preferences, jobs, licences, billing_plans, billing_prices, exchange_rates, platform_audit_log, invoices, billing_payment_methods, billing_charges, mcp_settings, mcp_connections, mcp_tokens, mcp_tool_calls cascade",
       ),
     )
     // Put back what migration 0007 seeds: the Standard plan and its first price.
     const migration = readFileSync(new URL("../drizzle/0007_platform_and_pricing.sql", import.meta.url), "utf8")
     for (const statement of migration.split("--> statement-breakpoint").filter((q) => q.includes("INSERT INTO"))) {
       await app.get<Db>(DB).execute(sql.raw(statement))
+    }
+    // ...and the later migrations that add new paid features to it.
+    for (const file of ["0017_mcp.sql"]) {
+      const later = readFileSync(new URL(`../drizzle/${file}`, import.meta.url), "utf8")
+      for (const statement of later.split("--> statement-breakpoint").filter((q) => q.includes('UPDATE "billing_plans"'))) {
+        await app.get<Db>(DB).execute(sql.raw(statement))
+      }
     }
   }
   const server = app.getHttpServer()

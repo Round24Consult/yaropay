@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BillingPanel } from "@/ee/billing-panel"
 import { LicencePanel } from "@/ee/licence-panel"
+import { AiAppsPanel } from "@/ee/mcp/ai-apps-panel"
 import { useEntitlements, useSettings } from "@/lib/api/hooks"
 import { useMe } from "@/lib/auth"
 import { hasPermission } from "@yaropay/core/auth"
@@ -16,7 +17,7 @@ import { NotificationsPanel } from "./notifications-panel"
 import { SecurityPanel } from "./security-panel"
 import { TeamPanel } from "./team-panel"
 
-const TABS = ["general", "team", "notifications", "security", "audit", "billing", "licence"] as const
+const TABS = ["general", "team", "notifications", "security", "ai-apps", "audit", "billing", "licence"] as const
 type Tab = (typeof TABS)[number]
 
 const TAB_META: Record<Tab, { label: string; permission: Permission | null }> = {
@@ -24,6 +25,7 @@ const TAB_META: Record<Tab, { label: string; permission: Permission | null }> = 
   team: { label: "Team", permission: "team:read" },
   notifications: { label: "Notifications", permission: null },
   security: { label: "Profile & security", permission: null },
+  "ai-apps": { label: "AI apps", permission: null },
   audit: { label: "Audit log", permission: "audit:read" },
   billing: { label: "Billing", permission: "settings:read" },
   licence: { label: "Licence", permission: "settings:read" },
@@ -72,6 +74,9 @@ export function SettingsView() {
         </TabsContent>
         <TabsContent value="security" className="mt-5">
           <SecurityPanel />
+        </TabsContent>
+        <TabsContent value="ai-apps" className="mt-5">
+          <AiAppsPanel />
         </TabsContent>
         {allowed.includes("audit") && (
           <TabsContent value="audit" className="mt-5">
